@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "354171526452",
+    "project_id": "howshousapp",
+    "storage_bucket": "howshousapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:354171526452:android:5fa055d00e99f8891cd961",
+        "android_client_info": {
+          "package_name": "io.github.howshous"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdV3fialNYS5pFL9RDLwmmUjm0Jlp6Z9s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

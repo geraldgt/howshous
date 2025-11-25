@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">HowsHous</string>
+    <string name="login">Login</string>
+    <string name="sign_up">Sign Up</string>
+    <string name="snap_send">Snap ‘n Send</string>
+    <string name="record_report">Record to Report</string>
+    <string name="voicemail_report">Voicemail Report</string>
+    <string name="text_report">Text Report</string>
+    <string name="emergency_tools">EMERGENCY TOOLS</string>
+</resources>
