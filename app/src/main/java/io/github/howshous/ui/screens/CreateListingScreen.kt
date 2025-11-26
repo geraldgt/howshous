@@ -10,10 +10,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +26,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -43,6 +50,7 @@ import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.theme.inputColors
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateListingScreen(nav: NavController) {
     var title by remember { mutableStateOf("") }
@@ -50,7 +58,48 @@ fun CreateListingScreen(nav: NavController) {
     var location by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
     var deposit by remember { mutableStateOf("") }
+    var selectedAmenities by remember { mutableStateOf(setOf<String>()) }
     var isSubmitting by remember { mutableStateOf(false) }
+    var locationExpanded by remember { mutableStateOf(false) }
+    
+    val baguioLocations = listOf(
+        "Baguio City Center",
+        "Session Road",
+        "Burnham Park",
+        "Camp John Hay",
+        "Mines View Park",
+        "Wright Park",
+        "Legarda Road",
+        "Leonard Wood Road",
+        "Naguilian Road",
+        "Marcos Highway",
+        "Loakan Road",
+        "Asin Road",
+        "Irisan",
+        "Aurora Hill",
+        "Quezon Hill",
+        "Pinsao",
+        "Bakakeng",
+        "Trancoville",
+        "Lower Magsaysay",
+        "Upper Magsaysay",
+        "Pacdal",
+        "Lualhati",
+        "Happy Hallow",
+        "Loakan Proper",
+        "Dagsian",
+        "Crystal Cave",
+        "Lucban",
+        "Gibraltar",
+        "Teodoro Alonzo",
+        "Rizal Monument"
+    )
+    
+    val availableAmenities = listOf(
+        "Free Parking", "WiFi", "Air Conditioning", "Pets Allowed",
+        "Kitchen Access", "Laundry", "Security", "CCTV", "Furnished",
+        "Near Public Transport", "Gym Access", "Swimming Pool"
+    )
 
     val context = LocalContext.current
     val uid by readUidFlow(context).collectAsState(initial = "")
@@ -105,14 +154,37 @@ fun CreateListingScreen(nav: NavController) {
                 )
                 Spacer(Modifier.height(12.dp))
 
-                OutlinedTextField(
-                    value = location,
-                    onValueChange = { location = it },
-                    label = { Text("Location") },
-                    shape = InputShape,
-                    colors = inputColors(),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                ExposedDropdownMenuBox(
+                    expanded = locationExpanded,
+                    onExpandedChange = { locationExpanded = !locationExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = location,
+                        onValueChange = { },
+                        readOnly = true,
+                        label = { Text("Location (Baguio City)") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = locationExpanded) },
+                        shape = InputShape,
+                        colors = inputColors(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = locationExpanded,
+                        onDismissRequest = { locationExpanded = false }
+                    ) {
+                        baguioLocations.forEach { loc ->
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(loc) },
+                                onClick = {
+                                    location = loc
+                                    locationExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
 
                 Row(
@@ -136,6 +208,33 @@ fun CreateListingScreen(nav: NavController) {
                         colors = inputColors(),
                         modifier = Modifier.weight(1f)
                     )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                
+                Text(
+                    text = "Amenities",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(availableAmenities) { amenity ->
+                        FilterChip(
+                            selected = selectedAmenities.contains(amenity),
+                            onClick = {
+                                selectedAmenities = if (selectedAmenities.contains(amenity)) {
+                                    selectedAmenities - amenity
+                                } else {
+                                    selectedAmenities + amenity
+                                }
+                            },
+                            label = { Text(amenity, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(24.dp))
@@ -170,7 +269,8 @@ fun CreateListingScreen(nav: NavController) {
                                         location = location.trim(),
                                         price = priceValue,
                                         deposit = depositValue,
-                                        status = "active"
+                                        status = "active",
+                                        amenities = selectedAmenities.toList()
                                     )
                                     val newId = listingRepository.createListing(listing)
                                     isSubmitting = false

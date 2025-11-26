@@ -82,8 +82,8 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                 item {
                     Text(listing!!.location, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
-                    Text("₹${listing!!.price}/month", style = MaterialTheme.typography.titleMedium, color = androidx.compose.ui.graphics.Color.Green)
-                    Text("Deposit: ₹${listing!!.deposit}", style = MaterialTheme.typography.bodySmall)
+                    Text("₱${listing!!.price}/month", style = MaterialTheme.typography.titleMedium, color = androidx.compose.ui.graphics.Color.Green)
+                    Text("Deposit: ₱${listing!!.deposit}", style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(16.dp))
                 }
 

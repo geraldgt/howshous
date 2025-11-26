@@ -26,6 +26,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,22 +36,34 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.theme.inputColors
 import io.github.howshous.ui.viewmodels.MessageAuthor
 import io.github.howshous.ui.viewmodels.TenantAIHelperViewModel
+import io.github.howshous.ui.util.MarkdownText
 import kotlinx.coroutines.launch
 
 @Composable
 fun TenantAIHelperScreen(nav: NavController, tenantAIHelperViewModel: TenantAIHelperViewModel = viewModel()) {
+    val context = LocalContext.current
+    val uid by readUidFlow(context).collectAsState(initial = "")
     val messages by tenantAIHelperViewModel.messages.collectAsState()
     val isThinking by tenantAIHelperViewModel.isThinking.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var currentPrompt by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    
+    // Initialize chat history when user ID is available
+    LaunchedEffect(uid) {
+        if (uid.isNotEmpty()) {
+            tenantAIHelperViewModel.initializeChat(uid)
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
@@ -93,7 +106,11 @@ fun TenantAIHelperScreen(nav: NavController, tenantAIHelperViewModel: TenantAIHe
                                 style = MaterialTheme.typography.labelSmall
                             )
                             Spacer(Modifier.height(4.dp))
-                            Text(message.text, style = MaterialTheme.typography.bodyMedium)
+                            if (isTenant) {
+                                Text(message.text, style = MaterialTheme.typography.bodyMedium)
+                            } else {
+                                MarkdownText(text = message.text)
+                            }
                         }
                     }
                 }
