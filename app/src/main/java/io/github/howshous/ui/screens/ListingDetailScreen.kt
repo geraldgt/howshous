@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import io.github.howshous.ui.theme.PricePointGreen
 import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.viewmodels.ListingViewModel
 
@@ -82,7 +83,7 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                 item {
                     Text(listing!!.location, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
-                    Text("₱${listing!!.price}/month", style = MaterialTheme.typography.titleMedium, color = androidx.compose.ui.graphics.Color.Green)
+                    Text("₱${listing!!.price}/month", style = MaterialTheme.typography.titleMedium, color = PricePointGreen)
                     Text("Deposit: ₱${listing!!.deposit}", style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(16.dp))
                 }

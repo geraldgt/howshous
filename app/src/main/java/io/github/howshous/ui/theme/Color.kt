@@ -33,6 +33,8 @@ val DueText = Color(0xFF977408)
 val OverdueRed = Color(0xFFFECACA)
 val OverdueText = Color(0xFFDC2626)
 
+// Misc Pallete
+val PricePointGreen = Color(0xFF157D17)
 
 // Greys
 val MutedGray = Color(0xFFD9D9D9)

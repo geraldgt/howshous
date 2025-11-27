@@ -27,6 +27,7 @@ import io.github.howshous.ui.viewmodels.AccountViewModel
 import kotlinx.coroutines.launch
 import io.github.howshous.ui.components.SearchBar
 import io.github.howshous.ui.components.NoListingsEmptyState
+import io.github.howshous.ui.theme.PricePointGreen
 
 @Composable
 fun TenantHome(nav: NavController) {
@@ -138,7 +139,7 @@ fun TenantHome(nav: NavController) {
                                 Text(listing.title, style = MaterialTheme.typography.titleSmall)
                                 Text(listing.location, style = MaterialTheme.typography.bodySmall)
                                 Spacer(Modifier.height(4.dp))
-                                Text("₱${listing.price}/month", style = MaterialTheme.typography.labelLarge, color = Color.Green)
+                                Text("₱${listing.price}/month", style = MaterialTheme.typography.labelLarge, color = PricePointGreen)
                             }
                         }
                     }
@@ -210,7 +211,7 @@ fun TenantSearch(nav: NavController) {
                             Text(listing.title, style = MaterialTheme.typography.titleSmall)
                             Text(listing.location, style = MaterialTheme.typography.bodySmall)
                             Spacer(Modifier.height(4.dp))
-                            Text("₱${listing.price}/month", style = MaterialTheme.typography.labelLarge, color = Color.Green)
+                            Text("₱${listing.price}/month", style = MaterialTheme.typography.labelLarge, color = PricePointGreen)
                         }
                     }
                 }

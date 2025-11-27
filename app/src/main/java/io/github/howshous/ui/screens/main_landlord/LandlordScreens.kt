@@ -22,6 +22,7 @@ import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.theme.DueYellow
 import io.github.howshous.ui.theme.OverdueRed
+import io.github.howshous.ui.theme.PricePointGreen
 import io.github.howshous.ui.theme.VacancyBlue
 import io.github.howshous.ui.viewmodels.HomeViewModel
 import io.github.howshous.ui.viewmodels.LandlordListingsViewModel
@@ -61,7 +62,7 @@ fun LandlordHome(nav: NavController) {
                 .padding(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            KPICard("$activeCount", "Active", Color.Green, Modifier.weight(1f))
+            KPICard("$activeCount", "Active", PricePointGreen, Modifier.weight(1f))
             KPICard("$vacantCount", "Vacant", VacancyBlue, Modifier.weight(1f))
             KPICard("$overdueCount", "Overdue", OverdueRed, Modifier.weight(1f))
         }
@@ -182,8 +183,8 @@ fun LandlordListings(nav: NavController) {
                             Text(listing.location, style = MaterialTheme.typography.bodySmall)
                             Spacer(Modifier.height(4.dp))
                             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                Text("₱${listing.price}/month", style = MaterialTheme.typography.labelLarge, color = Color.Green)
-                                Text(listing.status, style = MaterialTheme.typography.labelSmall, color = if (listing.status == "active") Color.Green else Color.Red)
+                                Text("₱${listing.price}/month", style = MaterialTheme.typography.labelLarge, color = PricePointGreen)
+                                Text(listing.status, style = MaterialTheme.typography.labelSmall, color = if (listing.status == "active") PricePointGreen else Color.Red)
                             }
                         }
                     }
