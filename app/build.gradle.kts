@@ -71,13 +71,13 @@ dependencies {
     implementation("androidx.datastore:datastore-core:1.1.0")
 
     // Database stuff
-    implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
-    implementation("com.google.firebase:firebase-analytics")
     implementation(platform(libs.firebase.bom))
+    implementation("com.google.firebase:firebase-analytics")
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
     implementation(libs.firebase.messaging)
+    implementation(libs.coroutines.play.services)
 
     implementation(libs.datastore.preferences)
 

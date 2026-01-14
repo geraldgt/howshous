@@ -2,9 +2,8 @@ package io.github.howshous.data.auth
 
 import android.content.Context
 import com.google.firebase.Timestamp
-import com.google.firebase.auth.auth
-import com.google.firebase.Firebase
-import com.google.firebase.firestore.firestore
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import io.github.howshous.ui.data.clearSession
 import kotlinx.coroutines.tasks.await
 import io.github.howshous.ui.data.saveRole
@@ -20,8 +19,8 @@ data class SimpleUser(
 )
 
 class AuthRepository(private val context: Context) {
-    private val auth = Firebase.auth
-    private val db = Firebase.firestore
+    private val auth = FirebaseAuth.getInstance()
+    private val db = FirebaseFirestore.getInstance()
 
     suspend fun signUpWithEmail(user: SimpleUser, password: String): Result<String> {
         return try {

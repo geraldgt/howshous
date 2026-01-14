@@ -1,13 +1,12 @@
 package io.github.howshous.data.contracts
 
-import com.google.firebase.firestore.firestore
-import com.google.firebase.Firebase
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 import com.google.firebase.Timestamp
 
 class ContractRepository {
-    private val db = Firebase.firestore
+    private val db = FirebaseFirestore.getInstance()
 
     suspend fun createFromTemplate(listingId: String, chatId: String, tenantId: String, landlordId: String): String {
         // Read listing and contract template

@@ -30,13 +30,14 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 # Firebase BOM and libs
-firebase-bom = "com.google.firebase:firebase-bom:33.6.0"
+firebase-bom = "com.google.firebase:firebase-bom:34.6.0"
 firebase-auth = { module = "com.google.firebase:firebase-auth" }
 firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
 firebase-storage = { module = "com.google.firebase:firebase-storage" }
 firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
 # DataStore preferences
 datastore-preferences = "androidx.datastore:datastore-preferences:1.1.1"
+coroutines-play-services = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1"
 androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtime" }
 
 [plugins]

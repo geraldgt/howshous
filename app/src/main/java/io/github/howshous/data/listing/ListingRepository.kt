@@ -1,7 +1,6 @@
 package io.github.howshous.data.listing
 
-import com.google.firebase.firestore.firestore
-import com.google.firebase.Firebase
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import com.google.firebase.Timestamp
 import java.util.UUID
@@ -21,7 +20,7 @@ data class Listing(
 )
 
 class ListingRepository {
-    private val db = Firebase.firestore
+    private val db = FirebaseFirestore.getInstance()
 
     suspend fun createListing(listing: Listing): String {
         val id = if (listing.id.isBlank()) UUID.randomUUID().toString() else listing.id

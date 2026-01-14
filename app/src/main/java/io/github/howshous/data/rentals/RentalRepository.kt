@@ -1,13 +1,12 @@
 package io.github.howshous.data.rental
 
-import com.google.firebase.firestore.firestore
-import com.google.firebase.Firebase
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 import com.google.firebase.Timestamp
 
 class RentalRepository {
-    private val db = Firebase.firestore
+    private val db = FirebaseFirestore.getInstance()
 
     suspend fun createRentalFromContract(contractId: String) {
         val contractDoc = db.collection("contracts").document(contractId).get().await()

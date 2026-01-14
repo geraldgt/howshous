@@ -1,13 +1,12 @@
 package io.github.howshous.data.storage
 
 import android.net.Uri
-import com.google.firebase.Firebase
-import com.google.firebase.storage.storage
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 object StorageHelper {
-    private val storage = Firebase.storage
+    private val storage = FirebaseStorage.getInstance()
 
     // returns download URL as string
     suspend fun uploadUserImage(uid: String, uri: Uri, pathSuffix: String = "profile.jpg"): String {

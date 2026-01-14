@@ -1,14 +1,13 @@
 package io.github.howshous.data.chat
 
-import com.google.firebase.firestore.firestore
-import com.google.firebase.Firebase
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 import com.google.firebase.firestore.ListenerRegistration
 
 class ChatRepository {
-    private val db = Firebase.firestore
+    private val db = FirebaseFirestore.getInstance()
 
     suspend fun getOrCreateChat(listingId: String, tenantId: String, landlordId: String): String {
         // Try to find an existing chat for (listingId, tenantId)
