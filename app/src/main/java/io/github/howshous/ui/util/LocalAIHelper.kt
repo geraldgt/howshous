@@ -253,6 +253,7 @@ object LocalAIHelper {
         
         matchedListings.forEachIndexed { index, listing ->
             response.append("**${index + 1}. ${listing.title}**\n")
+            appendListingTag(response, listing)
             response.append("• **Price:** ₱${listing.price}/month\n")
             response.append("• **Location:** ${listing.location}\n")
             if (listing.amenities.isNotEmpty()) {
@@ -264,7 +265,8 @@ object LocalAIHelper {
             response.append("\n")
         }
         
-        response.append("Would you like more details about any of these?")
+        response.append("Would you like more details about any of these?\n\n")
+        response.append(buildRecommendationsJsonBlock(matchedListings))
         return response.toString()
     }
     
@@ -307,6 +309,7 @@ object LocalAIHelper {
         if (topListings.size == 1) {
             val (listing, score) = topListings[0]
             response.append("**${listing.title}**\n")
+            appendListingTag(response, listing)
             response.append("• **Price:** ₱${listing.price} per month\n")
             response.append("• **Location:** ${listing.location}\n")
             if (listing.amenities.isNotEmpty()) {
@@ -326,6 +329,7 @@ object LocalAIHelper {
         } else {
             topListings.forEachIndexed { index, (listing, score) ->
                 response.append("**${index + 1}. ${listing.title}**\n")
+                appendListingTag(response, listing)
                 response.append("• **Price:** ₱${listing.price}/month")
                 if (budget > 0) {
                     val diff = listing.price - budget
@@ -356,7 +360,10 @@ object LocalAIHelper {
             )
             response.append(closings.random())
         }
-        
+
+        val recommendations = topListings.map { it.first }
+        response.append("\n\n")
+        response.append(buildRecommendationsJsonBlock(recommendations))
         return response.toString()
     }
     
@@ -380,6 +387,7 @@ object LocalAIHelper {
             
             append("However, here's the most affordable option I found:\n\n")
             append("**${cheapest.title}**\n")
+            appendListingTag(this, cheapest)
             append("• **Price:** ₱${cheapest.price} per month\n")
             append("• **Location:** ${cheapest.location}\n")
             if (cheapest.amenities.isNotEmpty()) {
@@ -396,7 +404,38 @@ object LocalAIHelper {
             } else {
                 append("\n*Would you like more details about this, or would you prefer to adjust your search criteria?*")
             }
+
+            append("\n\n")
+            append(buildRecommendationsJsonBlock(listOf(cheapest)))
         }
+    }
+
+    private fun appendListingTag(builder: StringBuilder, listing: ListingData) {
+        if (listing.id.isNotBlank()) {
+            builder.append("[[LISTING:${listing.id}]]\n")
+        }
+    }
+
+    private fun buildRecommendationsJsonBlock(listings: List<ListingData>): String {
+        val json = JSONObject().apply {
+            put(
+                "recommendations",
+                JSONArray().apply {
+                    listings.forEach { listing ->
+                        put(
+                            JSONObject().apply {
+                                put("id", listing.id)
+                                put("title", listing.title)
+                                put("price", listing.price)
+                                put("location", listing.location)
+                                put("amenities", JSONArray(listing.amenities))
+                            }
+                        )
+                    }
+                }
+            )
+        }
+        return "```json\n${json}\n```"
     }
 }
 

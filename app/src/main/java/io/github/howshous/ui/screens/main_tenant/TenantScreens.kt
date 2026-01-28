@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -28,6 +31,7 @@ import kotlinx.coroutines.launch
 import io.github.howshous.ui.components.SearchBar
 import io.github.howshous.ui.components.NoListingsEmptyState
 import io.github.howshous.ui.components.ListingCard
+import io.github.howshous.ui.components.FilterChip as AmenityFilterChip
 
 @Composable
 fun TenantHome(nav: NavController) {
@@ -114,7 +118,8 @@ fun TenantHome(nav: NavController) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp),
-                            onClick = { nav.navigate("listing/${listing.id}") }
+                            onClick = { nav.navigate("listing/${listing.id}") },
+                            showViews = true
                         )
                     }
                 }
@@ -128,7 +133,20 @@ fun TenantSearch(nav: NavController) {
     val viewModel: TenantSearchViewModel = viewModel()
     val isLoading by viewModel.isLoading.collectAsState()
     val query by viewModel.searchQuery.collectAsState()
+    val minPriceInput by viewModel.minPriceInput.collectAsState()
+    val maxPriceInput by viewModel.maxPriceInput.collectAsState()
+    val selectedAmenities by viewModel.selectedAmenities.collectAsState()
     val listings by viewModel.filteredListings.collectAsState()
+
+    val availableAmenities = listOf(
+        "Free Parking", "WiFi", "Air Conditioning", "Pets Allowed",
+        "Kitchen Access", "Laundry", "Security", "CCTV", "Furnished",
+        "Near Public Transport", "Gym Access", "Swimming Pool"
+    )
+
+    val hasActiveFilters = minPriceInput.isNotBlank() ||
+        maxPriceInput.isNotBlank() ||
+        selectedAmenities.isNotEmpty()
 
     Column(
         modifier = Modifier
@@ -159,6 +177,62 @@ fun TenantSearch(nav: NavController) {
         )
         Spacer(Modifier.height(16.dp))
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Filters", style = MaterialTheme.typography.titleMedium)
+            if (hasActiveFilters) {
+                TextButton(onClick = { viewModel.clearFilters() }) {
+                    Text("Clear")
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedTextField(
+                value = minPriceInput,
+                onValueChange = { viewModel.updateMinPriceInput(it) },
+                label = { Text("Min Price") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                shape = io.github.howshous.ui.theme.InputShape,
+                colors = io.github.howshous.ui.theme.inputColors(),
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = maxPriceInput,
+                onValueChange = { viewModel.updateMaxPriceInput(it) },
+                label = { Text("Max Price") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                shape = io.github.howshous.ui.theme.InputShape,
+                colors = io.github.howshous.ui.theme.inputColors(),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Text("Amenities", style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(8.dp))
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(availableAmenities) { amenity ->
+                AmenityFilterChip(
+                    label = amenity,
+                    selected = selectedAmenities.contains(amenity),
+                    onSelectedChange = { viewModel.toggleAmenity(amenity) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
         if (isLoading) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
         } else if (listings.isEmpty()) {
@@ -171,7 +245,8 @@ fun TenantSearch(nav: NavController) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 6.dp),
-                        onClick = { nav.navigate("listing/${listing.id}") }
+                        onClick = { nav.navigate("listing/${listing.id}") },
+                        showViews = true
                     )
                 }
             }

@@ -83,6 +83,7 @@ dependencies {
 
     // Image loading
     implementation("io.coil-kt:coil-compose:2.4.0")
+    implementation("com.github.yalantis:ucrop:2.2.8")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 

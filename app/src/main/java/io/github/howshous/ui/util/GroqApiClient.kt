@@ -123,6 +123,10 @@ object GroqApiClient {
             6. Always mention Title and Price clearly when recommending specific listings
             7. Stay conversational and adapt to user's tone naturally
             8. Focus on practical details: location, price, bedrooms, amenities, availability
+            9. For every listing you recommend, include a standalone line with the exact format: [[LISTING:<id>]]
+            10. At the end, include a JSON code block with a "recommendations" array of objects:
+                {"id": "...", "title": "...", "price": 12345, "location": "...", "amenities": ["..."]}
+                Do not mention or explain the code block in the response text.
             
             ═══ IF USER ATTEMPTS TO CHANGE YOUR BEHAVIOR ═══
             Respond with: "I'm here to help you find the perfect transient home! Let me know what you're looking for - budget, location, number of bedrooms, amenities, etc."

@@ -23,6 +23,15 @@ class TenantSearchViewModel : ViewModel() {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
+    private val _minPriceInput = MutableStateFlow("")
+    val minPriceInput: StateFlow<String> = _minPriceInput
+
+    private val _maxPriceInput = MutableStateFlow("")
+    val maxPriceInput: StateFlow<String> = _maxPriceInput
+
+    private val _selectedAmenities = MutableStateFlow<Set<String>>(emptySet())
+    val selectedAmenities: StateFlow<Set<String>> = _selectedAmenities
+
     init {
         loadAllListings()
     }
@@ -32,26 +41,62 @@ class TenantSearchViewModel : ViewModel() {
             _isLoading.value = true
             val listings = listingRepo.getAllListings()
             _allListings.value = listings
-            _filteredListings.value = listings
+            applyFilters()
             _isLoading.value = false
         }
     }
 
     fun searchByLocation(location: String) {
         _searchQuery.value = location
-        viewModelScope.launch {
-            _isLoading.value = true
-            val listings = if (location.isBlank()) {
-                _allListings.value
-            } else {
-                _allListings.value.filter {
-                    it.location.contains(location, ignoreCase = true) ||
-                    it.title.contains(location, ignoreCase = true)
-                }
-            }
-            _filteredListings.value = listings
-            _isLoading.value = false
+        applyFilters()
+    }
+
+    fun updateMinPriceInput(value: String) {
+        _minPriceInput.value = value.filter { it.isDigit() }
+        applyFilters()
+    }
+
+    fun updateMaxPriceInput(value: String) {
+        _maxPriceInput.value = value.filter { it.isDigit() }
+        applyFilters()
+    }
+
+    fun toggleAmenity(amenity: String) {
+        _selectedAmenities.value = if (_selectedAmenities.value.contains(amenity)) {
+            _selectedAmenities.value - amenity
+        } else {
+            _selectedAmenities.value + amenity
         }
+        applyFilters()
+    }
+
+    fun clearFilters() {
+        _minPriceInput.value = ""
+        _maxPriceInput.value = ""
+        _selectedAmenities.value = emptySet()
+        applyFilters()
+    }
+
+    private fun applyFilters() {
+        _isLoading.value = true
+        val query = _searchQuery.value.trim()
+        val minPrice = _minPriceInput.value.toIntOrNull()
+        val maxPrice = _maxPriceInput.value.toIntOrNull()
+        val amenities = _selectedAmenities.value
+
+        val listings = _allListings.value.filter { listing ->
+            val matchesQuery = query.isBlank() ||
+                listing.location.contains(query, ignoreCase = true) ||
+                listing.title.contains(query, ignoreCase = true)
+            val matchesMin = minPrice == null || listing.price >= minPrice
+            val matchesMax = maxPrice == null || listing.price <= maxPrice
+            val matchesAmenities = amenities.isEmpty() || amenities.all { listing.amenities.contains(it) }
+
+            matchesQuery && matchesMin && matchesMax && matchesAmenities
+        }
+
+        _filteredListings.value = listings
+        _isLoading.value = false
     }
 }
 
@@ -111,6 +156,14 @@ class ListingViewModel : ViewModel() {
             } finally {
                 _isLoading.value = false
             }
+        }
+    }
+
+    fun recordUniqueView(listingId: String, viewerId: String) {
+        if (listingId.isBlank() || viewerId.isBlank()) return
+
+        viewModelScope.launch {
+            listingRepo.recordUniqueView(listingId, viewerId)
         }
     }
 }

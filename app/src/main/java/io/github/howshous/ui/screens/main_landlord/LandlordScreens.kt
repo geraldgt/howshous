@@ -157,6 +157,7 @@ fun LandlordListings(nav: NavController) {
     val listingCreated by listingCreatedFlow?.collectAsState() ?: remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val listingRepository = remember { io.github.howshous.data.firestore.ListingRepository() }
 
     LaunchedEffect(uid) {
         if (uid.isNotEmpty()) viewModel.loadListingsForLandlord(uid)
@@ -197,7 +198,11 @@ fun LandlordListings(nav: NavController) {
                 onClick = {
                     scope.launch {
                         try {
-                            val createdIds = SampleListingsGenerator.generateSampleListings()
+                            if (uid.isBlank()) {
+                                snackbarHostState.showSnackbar("Missing user id.")
+                                return@launch
+                            }
+                            val createdIds = SampleListingsGenerator.generateSampleListings(uid)
                             if (createdIds.isNotEmpty()) {
                                 snackbarHostState.showSnackbar("Generated ${createdIds.size} sample listings!")
                                 // Refresh listings
@@ -219,6 +224,24 @@ fun LandlordListings(nav: NavController) {
             }
         }
 
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = {
+                scope.launch {
+                    if (uid.isBlank()) {
+                        snackbarHostState.showSnackbar("Missing user id.")
+                        return@launch
+                    }
+                    val updated = listingRepository.backfillUniqueViewCountsForLandlord(uid)
+                    snackbarHostState.showSnackbar("Recounted views for $updated listings.")
+                    viewModel.loadListingsForLandlord(uid)
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Recount Unique Views")
+        }
+
         Spacer(Modifier.height(16.dp))
 
         if (isLoading) {
@@ -233,7 +256,8 @@ fun LandlordListings(nav: NavController) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 6.dp),
-                        showStatus = true
+                        showStatus = true,
+                        showViews = true
                     )
                 }
             }

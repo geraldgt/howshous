@@ -6,10 +6,20 @@ import io.github.howshous.data.models.Listing
 import kotlinx.coroutines.tasks.await
 
 object SampleListingsGenerator {
-    
+
+    private data class SampleListingTemplate(
+        val title: String,
+        val description: String,
+        val location: String,
+        val price: Int,
+        val deposit: Int,
+        val status: String,
+        val amenities: List<String>,
+        val photos: List<String> = emptyList()
+    )
+
     private val sampleListings = listOf(
-        Listing(
-            landlordId = "sample_landlord_1",
+        SampleListingTemplate(
             title = "Cozy Studio Near Session Road",
             description = "Bright and airy studio unit perfect for students or young professionals. Walking distance to Session Road, SM Baguio, and restaurants. Fully furnished with basic appliances.",
             location = "Session Road",
@@ -18,8 +28,7 @@ object SampleListingsGenerator {
             status = "active",
             amenities = listOf("WiFi", "Air Conditioning", "Furnished", "Near Public Transport", "Security")
         ),
-        Listing(
-            landlordId = "sample_landlord_2",
+        SampleListingTemplate(
             title = "Spacious Room with Private Bathroom",
             description = "Large room with private bathroom in a quiet neighborhood. Shared kitchen and living area. Perfect for professionals working in Baguio City Center.",
             location = "Baguio City Center",
@@ -28,8 +37,7 @@ object SampleListingsGenerator {
             status = "active",
             amenities = listOf("Free Parking", "WiFi", "Air Conditioning", "Kitchen Access", "Laundry", "CCTV", "Security")
         ),
-        Listing(
-            landlordId = "sample_landlord_3",
+        SampleListingTemplate(
             title = "Budget-Friendly Boarding House",
             description = "Affordable room in a friendly boarding house. Shared facilities, clean and well-maintained. Great for students on a tight budget.",
             location = "Irisan",
@@ -38,8 +46,7 @@ object SampleListingsGenerator {
             status = "active",
             amenities = listOf("WiFi", "Kitchen Access", "Laundry", "Security")
         ),
-        Listing(
-            landlordId = "sample_landlord_4",
+        SampleListingTemplate(
             title = "Premium Room with Gym Access",
             description = "Luxury boarding house with modern amenities. Access to gym and swimming pool. Perfect for professionals who value comfort and convenience.",
             location = "Camp John Hay",
@@ -48,8 +55,7 @@ object SampleListingsGenerator {
             status = "active",
             amenities = listOf("Free Parking", "WiFi", "Air Conditioning", "Gym Access", "Swimming Pool", "Furnished", "Security", "CCTV", "Kitchen Access", "Laundry")
         ),
-        Listing(
-            landlordId = "sample_landlord_5",
+        SampleListingTemplate(
             title = "Pet-Friendly Boarding House",
             description = "Comfortable room in a pet-friendly environment. Your furry friends are welcome! Close to Burnham Park and pet stores.",
             location = "Burnham Park",
@@ -58,8 +64,7 @@ object SampleListingsGenerator {
             status = "active",
             amenities = listOf("Pets Allowed", "Free Parking", "WiFi", "Air Conditioning", "Kitchen Access", "Laundry", "Security")
         ),
-        Listing(
-            landlordId = "sample_landlord_6",
+        SampleListingTemplate(
             title = "Student-Friendly Dormitory",
             description = "Clean and safe dormitory near universities. Study areas available. Strict security for peace of mind.",
             location = "Legarda Road",
@@ -68,8 +73,7 @@ object SampleListingsGenerator {
             status = "active",
             amenities = listOf("WiFi", "Air Conditioning", "Security", "CCTV", "Near Public Transport")
         ),
-        Listing(
-            landlordId = "sample_landlord_7",
+        SampleListingTemplate(
             title = "Modern Studio with Balcony",
             description = "Newly renovated studio with private balcony. Modern design, fully furnished. Perfect for young professionals.",
             location = "Aurora Hill",
@@ -78,8 +82,7 @@ object SampleListingsGenerator {
             status = "active",
             amenities = listOf("WiFi", "Air Conditioning", "Furnished", "Kitchen Access", "Laundry", "Security", "CCTV")
         ),
-        Listing(
-            landlordId = "sample_landlord_8",
+        SampleListingTemplate(
             title = "Affordable Room Near Business District",
             description = "Simple but comfortable room near major business areas. Easy commute to Session Road and SM Baguio.",
             location = "Lower Magsaysay",
@@ -88,8 +91,7 @@ object SampleListingsGenerator {
             status = "active",
             amenities = listOf("WiFi", "Air Conditioning", "Near Public Transport", "Security", "Kitchen Access")
         ),
-        Listing(
-            landlordId = "sample_landlord_9",
+        SampleListingTemplate(
             title = "Family-Style Boarding House",
             description = "Homey atmosphere in a family-run boarding house. Shared meals available. Great for those looking for a community feel.",
             location = "Quezon Hill",
@@ -98,8 +100,7 @@ object SampleListingsGenerator {
             status = "active",
             amenities = listOf("WiFi", "Kitchen Access", "Laundry", "Security", "Near Public Transport")
         ),
-        Listing(
-            landlordId = "sample_landlord_10",
+        SampleListingTemplate(
             title = "Luxury Room with Mountain View",
             description = "Premium room with stunning mountain views. Top-of-the-line amenities and 24/7 security. Perfect for those who want the best.",
             location = "Mines View Park",
@@ -110,28 +111,33 @@ object SampleListingsGenerator {
         )
     )
     
-    suspend fun generateSampleListings(): List<String> {
+    suspend fun generateSampleListings(landlordId: String): List<String> {
+        if (landlordId.isBlank()) return emptyList()
         val db = FirebaseFirestore.getInstance()
         val createdIds = mutableListOf<String>()
         
         return try {
-            // First, delete all existing sample listings
-            deleteExistingSampleListings()
+            // First, delete existing sample listings for this landlord
+            deleteExistingSampleListings(landlordId)
             
             // Then create new sample listings
-            sampleListings.forEach { listing ->
+            sampleListings.forEach { template ->
                 val docRef = db.collection("listings").document()
+                val now = Timestamp.now()
                 val listingMap = hashMapOf<String, Any>(
-                    "landlordId" to listing.landlordId,
-                    "title" to listing.title,
-                    "description" to listing.description,
-                    "location" to listing.location,
-                    "price" to listing.price,
-                    "deposit" to listing.deposit,
-                    "status" to listing.status,
-                    "amenities" to listing.amenities,
-                    "photos" to listing.photos,
-                    "createdAt" to Timestamp.now()
+                    "landlordId" to landlordId,
+                    "title" to template.title,
+                    "description" to template.description,
+                    "location" to template.location,
+                    "price" to template.price,
+                    "deposit" to template.deposit,
+                    "status" to template.status,
+                    "amenities" to template.amenities,
+                    "photos" to template.photos,
+                    "createdAt" to now,
+                    "updatedAt" to now,
+                    "uniqueViewCount" to 0,
+                    "isSample" to true
                 )
                 docRef.set(listingMap).await()
                 createdIds.add(docRef.id)
@@ -143,23 +149,17 @@ object SampleListingsGenerator {
         }
     }
     
-    private suspend fun deleteExistingSampleListings() {
+    private suspend fun deleteExistingSampleListings(landlordId: String) {
         val db = FirebaseFirestore.getInstance()
         try {
-            // Get all listings with landlordId starting with "sample_landlord_"
-            val sampleLandlordIds = sampleListings.map { it.landlordId }
-            
-            // Query for each sample landlord ID and delete their listings
-            sampleLandlordIds.forEach { landlordId ->
-                val query = db.collection("listings")
-                    .whereEqualTo("landlordId", landlordId)
-                    .get()
-                    .await()
-                
-                // Delete each document
-                query.documents.forEach { doc ->
-                    doc.reference.delete().await()
-                }
+            val query = db.collection("listings")
+                .whereEqualTo("landlordId", landlordId)
+                .whereEqualTo("isSample", true)
+                .get()
+                .await()
+
+            query.documents.forEach { doc ->
+                doc.reference.delete().await()
             }
         } catch (e: Exception) {
             e.printStackTrace()

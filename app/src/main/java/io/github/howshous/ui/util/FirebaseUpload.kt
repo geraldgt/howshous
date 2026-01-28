@@ -19,7 +19,9 @@ suspend fun uploadCompressedImage(
 
     // Read file stream
     val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-    val bitmap = BitmapFactory.decodeStream(inputStream)
+    val bitmap = inputStream?.use { stream ->
+        BitmapFactory.decodeStream(stream)
+    } ?: throw IllegalStateException("Unable to decode image.")
 
     // Compress JPEG
     val jpg = ByteArrayOutputStream()

@@ -103,52 +103,60 @@ class SignupViewModel : ViewModel() {
 
         val selfieUri = tenantSelfie.value
             ?: return Result.failure(IllegalStateException("Selfie is missing."))
-        val profileUrl = uploadCompressedImage(
-            context,
-            selfieUri,
-            "users/$uid/profile.jpg"
-        )
+        return try {
+            val profileUrl = uploadCompressedImage(
+                context,
+                selfieUri,
+                "users/$uid/profile.jpg"
+            )
 
-        val idUri = tenantId.value
-            ?: return Result.failure(IllegalStateException("ID photo is missing."))
+            val idUri = tenantId.value
+                ?: return Result.failure(IllegalStateException("ID photo is missing."))
 
-        val selfieVerificationUrl = uploadCompressedImage(
-            context,
-            selfieUri,
-            "verifications/$uid/selfie.jpg"
-        )
+            val selfieVerificationUrl = uploadCompressedImage(
+                context,
+                selfieUri,
+                "verifications/$uid/selfie.jpg"
+            )
 
-        val idVerificationUrl = uploadCompressedImage(
-            context,
-            idUri,
-            "verifications/$uid/id.jpg"
-        )
+            val idVerificationUrl = uploadCompressedImage(
+                context,
+                idUri,
+                "verifications/$uid/id.jpg"
+            )
 
-        val userDoc = hashMapOf(
-            "uid" to uid,
-            "firstName" to firstName.value,
-            "lastName" to lastName.value,
-            "email" to email,
-            "role" to "tenant",
-            "verified" to false,
-            "profileImageUrl" to profileUrl
-        )
+            val userDoc = hashMapOf(
+                "uid" to uid,
+                "firstName" to firstName.value,
+                "lastName" to lastName.value,
+                "email" to email,
+                "role" to "tenant",
+                "verified" to false,
+                "profileImageUrl" to profileUrl
+            )
 
-        db.collection("users").document(uid).set(userDoc).await()
+            db.collection("users").document(uid).set(userDoc).await()
 
-        val verificationDoc = hashMapOf(
-            "selfieUrl" to selfieVerificationUrl,
-            "idUrl" to idVerificationUrl,
-            "propertyUrl" to "",
-            "status" to "pending",
-            "submittedAt" to FieldValue.serverTimestamp()
-        )
+            val verificationDoc = hashMapOf(
+                "selfieUrl" to selfieVerificationUrl,
+                "idUrl" to idVerificationUrl,
+                "propertyUrl" to "",
+                "status" to "pending",
+                "submittedAt" to FieldValue.serverTimestamp()
+            )
 
-        db.collection("verifications").document(uid).set(verificationDoc).await()
+            db.collection("verifications").document(uid).set(verificationDoc).await()
 
-        FirebaseAuth.getInstance().signOut()
+            FirebaseAuth.getInstance().signOut()
 
-        return Result.success(Unit)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            try {
+                auth.currentUser?.takeIf { it.uid == uid }?.delete()?.await()
+            } catch (_: Exception) {
+            }
+            Result.failure(e)
+        }
     }
 
     // LANDLORD
@@ -177,52 +185,60 @@ class SignupViewModel : ViewModel() {
             return Result.failure(e)
         }
 
-        // Upload profile (selfie)
-        val selfieUri = landlordSelfie.value
-            ?: return Result.failure(IllegalStateException("Selfie is missing."))
-        val profileUrl = uploadCompressedImage(
-            context,
-            selfieUri,
-            "users/$uid/profile.jpg"
-        )
+        return try {
+            // Upload profile (selfie)
+            val selfieUri = landlordSelfie.value
+                ?: return Result.failure(IllegalStateException("Selfie is missing."))
+            val profileUrl = uploadCompressedImage(
+                context,
+                selfieUri,
+                "users/$uid/profile.jpg"
+            )
 
-        // Upload verification files
-        val idUri = landlordId.value
-            ?: return Result.failure(IllegalStateException("ID photo is missing."))
-        val propertyUri = landlordPropertyDoc.value
-            ?: return Result.failure(IllegalStateException("Property document is missing."))
+            // Upload verification files
+            val idUri = landlordId.value
+                ?: return Result.failure(IllegalStateException("ID photo is missing."))
+            val propertyUri = landlordPropertyDoc.value
+                ?: return Result.failure(IllegalStateException("Property document is missing."))
 
-        val selfieVerificationUrl = uploadCompressedImage(context, selfieUri, "verifications/$uid/selfie.jpg")
-        val idVerificationUrl = uploadCompressedImage(context, idUri, "verifications/$uid/id.jpg")
-        val propertyVerificationUrl = uploadCompressedImage(context, propertyUri, "verifications/$uid/property.jpg")
+            val selfieVerificationUrl = uploadCompressedImage(context, selfieUri, "verifications/$uid/selfie.jpg")
+            val idVerificationUrl = uploadCompressedImage(context, idUri, "verifications/$uid/id.jpg")
+            val propertyVerificationUrl = uploadCompressedImage(context, propertyUri, "verifications/$uid/property.jpg")
 
-        // User doc
-        val userDoc = hashMapOf(
-            "uid" to uid,
-            "firstName" to firstName.value,
-            "lastName" to lastName.value,
-            "email" to email,
-            "role" to "landlord",
-            "verified" to false,
-            "profileImageUrl" to profileUrl
-        )
+            // User doc
+            val userDoc = hashMapOf(
+                "uid" to uid,
+                "firstName" to firstName.value,
+                "lastName" to lastName.value,
+                "email" to email,
+                "role" to "landlord",
+                "verified" to false,
+                "profileImageUrl" to profileUrl
+            )
 
-        db.collection("users").document(uid).set(userDoc).await()
+            db.collection("users").document(uid).set(userDoc).await()
 
-        // Verification doc
-        val verificationDoc = hashMapOf(
-            "selfieUrl" to selfieVerificationUrl,
-            "idUrl" to idVerificationUrl,
-            "propertyUrl" to propertyVerificationUrl,
-            "status" to "pending",
-            "submittedAt" to FieldValue.serverTimestamp()
-        )
+            // Verification doc
+            val verificationDoc = hashMapOf(
+                "selfieUrl" to selfieVerificationUrl,
+                "idUrl" to idVerificationUrl,
+                "propertyUrl" to propertyVerificationUrl,
+                "status" to "pending",
+                "submittedAt" to FieldValue.serverTimestamp()
+            )
 
-        db.collection("verifications").document(uid).set(verificationDoc).await()
+            db.collection("verifications").document(uid).set(verificationDoc).await()
 
-        FirebaseAuth.getInstance().signOut()
+            FirebaseAuth.getInstance().signOut()
 
-        return Result.success(Unit)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            try {
+                auth.currentUser?.takeIf { it.uid == uid }?.delete()?.await()
+            } catch (_: Exception) {
+            }
+            Result.failure(e)
+        }
     }
 
 

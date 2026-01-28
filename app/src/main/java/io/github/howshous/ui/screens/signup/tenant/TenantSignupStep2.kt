@@ -27,6 +27,8 @@ import io.github.howshous.R
 import io.github.howshous.ui.components.DebouncedIconButton
 import io.github.howshous.ui.theme.TenantGreen
 import io.github.howshous.ui.theme.TenantGreenDark
+import io.github.howshous.ui.util.buildCropIntent
+import io.github.howshous.ui.util.getCroppedUri
 import io.github.howshous.ui.util.saveBitmapToCache
 import io.github.howshous.ui.viewmodels.SignupViewModel
 
@@ -41,12 +43,27 @@ fun TenantSignupStep2(nav: NavController, signupVM: SignupViewModel) {
             .background(TenantGreen)
             .padding(32.dp)
     ) {
+        val cropLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            val cropped = getCroppedUri(result.data)
+            if (cropped != null) {
+                selectedImageUri = cropped
+            }
+        }
+
         val cameraLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.TakePicturePreview()
         ) { bitmap ->
             if (bitmap != null) {
                 val uri = saveBitmapToCache(context, bitmap)
-                selectedImageUri = uri
+                cropLauncher.launch(
+                    buildCropIntent(
+                        context = context,
+                        sourceUri = uri,
+                        freeStyle = true
+                    )
+                )
             }
         }
 
@@ -54,7 +71,13 @@ fun TenantSignupStep2(nav: NavController, signupVM: SignupViewModel) {
             contract = ActivityResultContracts.GetContent()
         ) { uri ->
             if (uri != null) {
-                selectedImageUri = uri
+                cropLauncher.launch(
+                    buildCropIntent(
+                        context = context,
+                        sourceUri = uri,
+                        freeStyle = true
+                    )
+                )
             }
         }
 

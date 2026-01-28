@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import io.github.howshous.data.firestore.ListingRepository
 import io.github.howshous.data.firestore.AIChatRepository
+import io.github.howshous.data.models.Listing
 import io.github.howshous.ui.util.LocalAIHelper  // Available for offline testing or fallback
 import io.github.howshous.ui.util.GroqApiClient
 import org.json.JSONArray
@@ -36,6 +37,9 @@ class TenantAIHelperViewModel : ViewModel() {
 
     private val _isThinking = MutableStateFlow(false)
     val isThinking: StateFlow<Boolean> = _isThinking
+
+    private val _listingCache = MutableStateFlow<Map<String, Listing>>(emptyMap())
+    val listingCache: StateFlow<Map<String, Listing>> = _listingCache
     
     private var currentUserId: String = ""
     
@@ -50,6 +54,23 @@ class TenantAIHelperViewModel : ViewModel() {
             aiChatRepository.initializeWelcomeMessage(userId)
             // Load existing messages
             loadChatHistory(userId)
+        }
+    }
+
+    fun ensureListings(listingIds: List<String>) {
+        val uniqueIds = listingIds.distinct().filter { it.isNotBlank() }
+        val missingIds = uniqueIds.filter { !_listingCache.value.containsKey(it) }
+        if (missingIds.isEmpty()) return
+
+        viewModelScope.launch {
+            val updated = _listingCache.value.toMutableMap()
+            for (id in missingIds) {
+                val listing = listingRepository.getListing(id)
+                if (listing != null) {
+                    updated[id] = listing
+                }
+            }
+            _listingCache.value = updated
         }
     }
     

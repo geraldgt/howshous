@@ -26,8 +26,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import io.github.howshous.R
 import io.github.howshous.data.models.Listing
 import io.github.howshous.ui.theme.MutedGray
 import io.github.howshous.ui.theme.NearWhite
@@ -40,7 +42,8 @@ fun ListingCard(
     listing: Listing,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    showStatus: Boolean = false
+    showStatus: Boolean = false,
+    showViews: Boolean = false
 ) {
     val clickableModifier = if (onClick != null) {
         modifier.clickable(onClick = onClick)
@@ -105,6 +108,26 @@ fun ListingCard(
                     style = MaterialTheme.typography.labelLarge,
                     color = PricePointGreen
                 )
+
+                if (showViews) {
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.i_eyeopen),
+                            contentDescription = null,
+                            tint = slightlyGray,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            "${listing.uniqueViewCount}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = slightlyGray
+                        )
+                    }
+                }
             }
 
             if (showStatus) {

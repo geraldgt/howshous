@@ -25,6 +25,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,6 +51,8 @@ import io.github.howshous.ui.viewmodels.MessageAuthor
 import io.github.howshous.ui.viewmodels.TenantAIHelperViewModel
 import io.github.howshous.ui.util.MarkdownText
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 @Composable
 fun TenantAIHelperScreen(nav: NavController, tenantAIHelperViewModel: TenantAIHelperViewModel = viewModel()) {
@@ -57,6 +60,7 @@ fun TenantAIHelperScreen(nav: NavController, tenantAIHelperViewModel: TenantAIHe
     val uid by readUidFlow(context).collectAsState(initial = "")
     val messages by tenantAIHelperViewModel.messages.collectAsState()
     val isThinking by tenantAIHelperViewModel.isThinking.collectAsState()
+    val listingCache by tenantAIHelperViewModel.listingCache.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var currentPrompt by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
@@ -112,7 +116,20 @@ fun TenantAIHelperScreen(nav: NavController, tenantAIHelperViewModel: TenantAIHe
                             if (isTenant) {
                                 Text(message.text, style = MaterialTheme.typography.bodyMedium)
                             } else {
-                                MarkdownText(text = message.text)
+                                val parsed = remember(message.text) { parseAiMessage(message.text) }
+                                MarkdownText(text = parsed.cleanedText)
+                                if (parsed.listingIds.isNotEmpty()) {
+                                    LaunchedEffect(parsed.listingIds) {
+                                        tenantAIHelperViewModel.ensureListings(parsed.listingIds)
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                    ListingRecommendations(
+                                        recommendations = parsed.recommendations,
+                                        listingIds = parsed.listingIds,
+                                        listingCache = listingCache,
+                                        onListingClick = { id -> nav.navigate("listing/$id") }
+                                    )
+                                }
                             }
                         }
                     }
@@ -166,6 +183,157 @@ fun TenantAIHelperScreen(nav: NavController, tenantAIHelperViewModel: TenantAIHe
                 ) {
                     Text(if (isThinking) "Thinking..." else "Ask the AI")
                 }
+            }
+        }
+    }
+}
+
+private data class ParsedAiMessage(
+    val cleanedText: String,
+    val listingIds: List<String>,
+    val recommendations: List<AiRecommendation>
+)
+
+private fun parseAiMessage(text: String): ParsedAiMessage {
+    val jsonBlockRegex = Regex("```json\\s*([\\s\\S]*?)\\s*```", RegexOption.IGNORE_CASE)
+    val tagRegex = Regex("\\[\\[LISTING:([^\\]]+)\\]\\]")
+    val idLineRegex = Regex("(?im)^\\s*(?:listing\\s*id|id)\\s*[:#]\\s*([A-Za-z0-9_-]+)\\s*$")
+
+    val ids = mutableListOf<String>()
+    val recommendations = mutableListOf<AiRecommendation>()
+
+    jsonBlockRegex.findAll(text).forEach { match ->
+        val jsonText = match.groupValues.getOrNull(1)?.trim().orEmpty()
+        parseRecommendationsFromJson(jsonText)?.let { recs ->
+            recommendations.addAll(recs)
+            recs.forEach { rec ->
+                if (rec.id.isNotBlank()) ids.add(rec.id)
+            }
+        }
+    }
+
+    tagRegex.findAll(text).forEach { match ->
+        match.groupValues.getOrNull(1)?.trim()?.let { id ->
+            if (id.isNotBlank()) ids.add(id)
+        }
+    }
+    idLineRegex.findAll(text).forEach { match ->
+        match.groupValues.getOrNull(1)?.trim()?.let { id ->
+            if (id.isNotBlank()) ids.add(id)
+        }
+    }
+
+    val cleaned = text
+        .replace(jsonBlockRegex, "")
+        .replace(tagRegex, "")
+        .replace(idLineRegex, "")
+        .replace(Regex("\\n{3,}"), "\n\n")
+        .trim()
+
+    return ParsedAiMessage(
+        cleanedText = cleaned,
+        listingIds = ids.distinct(),
+        recommendations = recommendations.distinctBy { it.id.ifBlank { it.title } }
+    )
+}
+
+private data class AiRecommendation(
+    val id: String,
+    val title: String,
+    val price: Int,
+    val location: String,
+    val amenities: List<String>
+)
+
+private fun parseRecommendationsFromJson(jsonText: String): List<AiRecommendation>? {
+    return runCatching {
+        val root = JSONObject(jsonText)
+        val array = root.optJSONArray("recommendations") ?: root.optJSONArray("listings") ?: return emptyList()
+        (0 until array.length()).mapNotNull { index ->
+            val obj = array.optJSONObject(index) ?: return@mapNotNull null
+            AiRecommendation(
+                id = obj.optString("id", ""),
+                title = obj.optString("title", ""),
+                price = obj.optInt("price", 0),
+                location = obj.optString("location", ""),
+                amenities = obj.optJSONArray("amenities")?.toStringList().orEmpty()
+            )
+        }
+    }.getOrNull()
+}
+
+private fun JSONArray.toStringList(): List<String> {
+    return (0 until length()).mapNotNull { idx ->
+        optString(idx, null)
+    }
+}
+
+@Composable
+private fun ListingRecommendations(
+    recommendations: List<AiRecommendation>,
+    listingIds: List<String>,
+    listingCache: Map<String, io.github.howshous.data.models.Listing>,
+    onListingClick: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (recommendations.isNotEmpty()) {
+            recommendations.forEach { rec ->
+                ListingRecommendationCard(
+                    title = rec.title.ifBlank { listingCache[rec.id]?.title.orEmpty() },
+                    price = rec.price.takeIf { it > 0 } ?: (listingCache[rec.id]?.price ?: 0),
+                    location = rec.location.ifBlank { listingCache[rec.id]?.location.orEmpty() },
+                    amenities = if (rec.amenities.isNotEmpty()) rec.amenities else listingCache[rec.id]?.amenities.orEmpty(),
+                    onClick = { if (rec.id.isNotBlank()) onListingClick(rec.id) }
+                )
+            }
+        } else {
+            listingIds.forEach { listingId ->
+                val listing = listingCache[listingId]
+                ListingRecommendationCard(
+                    title = listing?.title ?: "Listing",
+                    price = listing?.price ?: 0,
+                    location = listing?.location ?: "",
+                    amenities = listing?.amenities ?: emptyList(),
+                    onClick = { onListingClick(listingId) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ListingRecommendationCard(
+    title: String,
+    price: Int,
+    location: String,
+    amenities: List<String>,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = if (title.isNotBlank()) title else "Listing",
+                style = MaterialTheme.typography.titleSmall
+            )
+            if (price > 0) {
+                Text("₱$price/month", style = MaterialTheme.typography.bodySmall)
+            }
+            if (location.isNotBlank()) {
+                Text(location, style = MaterialTheme.typography.bodySmall)
+            }
+            if (amenities.isNotEmpty()) {
+                Text(
+                    "Amenities: ${amenities.take(4).joinToString(", ")}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            TextButton(onClick = onClick) {
+                Text("View listing")
             }
         }
     }

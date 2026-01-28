@@ -30,6 +30,8 @@ import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.theme.OverdueRed
 import io.github.howshous.ui.theme.PricePointGreen
 import io.github.howshous.ui.theme.SurfaceLight
+import io.github.howshous.ui.util.buildCropIntent
+import io.github.howshous.ui.util.getCroppedUri
 import io.github.howshous.ui.util.saveBitmapToCache
 import io.github.howshous.ui.util.uploadCompressedImage
 import kotlinx.coroutines.launch
@@ -56,12 +58,27 @@ fun IssueDetailScreen(nav: NavController, issueId: String) {
         }
     }
     
+    val cropLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val cropped = getCroppedUri(result.data)
+        if (cropped != null) {
+            resolutionPhotoUri = cropped
+        }
+    }
+
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
         bitmap?.let {
             val uri = saveBitmapToCache(context, it)
-            resolutionPhotoUri = uri
+            cropLauncher.launch(
+                buildCropIntent(
+                    context = context,
+                    sourceUri = uri,
+                    freeStyle = true
+                )
+            )
         }
     }
     

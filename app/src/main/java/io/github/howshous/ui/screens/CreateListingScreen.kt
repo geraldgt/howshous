@@ -43,7 +43,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import android.net.Uri
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import coil.compose.AsyncImage
 import io.github.howshous.data.models.Listing
@@ -53,6 +55,8 @@ import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.theme.InputShape
 import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.theme.inputColors
+import io.github.howshous.ui.util.buildCropIntent
+import io.github.howshous.ui.util.getCroppedUri
 import io.github.howshous.ui.util.saveBitmapToCache
 import io.github.howshous.ui.util.uploadCompressedImage
 import kotlinx.coroutines.launch
@@ -68,7 +72,9 @@ fun CreateListingScreen(nav: NavController) {
     var selectedAmenities by remember { mutableStateOf(setOf<String>()) }
     var isSubmitting by remember { mutableStateOf(false) }
     var locationExpanded by remember { mutableStateOf(false) }
-    var selectedPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedPhotoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var pendingCropUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var isCropping by remember { mutableStateOf(false) }
     
     val baguioLocations = listOf(
         "Baguio City Center",
@@ -114,16 +120,50 @@ fun CreateListingScreen(nav: NavController) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val listingRepository = remember { ListingRepository() }
+    lateinit var cropLauncher: ActivityResultLauncher<Intent>
+    fun launchNextCrop() {
+        if (isCropping || pendingCropUris.isEmpty()) return
+        val next = pendingCropUris.first()
+        pendingCropUris = pendingCropUris.drop(1)
+        isCropping = true
+        cropLauncher.launch(
+            buildCropIntent(
+                context = context,
+                sourceUri = next,
+                freeStyle = true
+            )
+        )
+    }
+    cropLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val cropped = getCroppedUri(result.data)
+        if (cropped != null) {
+            selectedPhotoUris = (selectedPhotoUris + cropped).distinct()
+        }
+        isCropping = false
+        if (pendingCropUris.isNotEmpty()) {
+            launchNextCrop()
+        }
+    }
+
     val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        selectedPhotoUri = uri
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            pendingCropUris = pendingCropUris + uris
+            launchNextCrop()
+        }
     }
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
         if (bitmap != null) {
-            selectedPhotoUri = saveBitmapToCache(context, bitmap)
+            val uri = saveBitmapToCache(context, bitmap)
+            if (uri != null) {
+                pendingCropUris = pendingCropUris + uri
+                launchNextCrop()
+            }
         }
     }
 
@@ -260,7 +300,7 @@ fun CreateListingScreen(nav: NavController) {
                 Spacer(Modifier.height(24.dp))
 
                 Text(
-                    text = "Listing Photo",
+                    text = "Listing Photos",
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
@@ -280,20 +320,26 @@ fun CreateListingScreen(nav: NavController) {
                         onClick = { photoPicker.launch("image/*") },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(if (selectedPhotoUri == null) "Choose Photo" else "Change Photo")
+                        Text(if (selectedPhotoUris.isEmpty()) "Choose Photos" else "Add Photos")
                     }
                 }
 
-                if (selectedPhotoUri != null) {
+                if (selectedPhotoUris.isNotEmpty()) {
                     Spacer(Modifier.height(12.dp))
-                    AsyncImage(
-                        model = selectedPhotoUri,
-                        contentDescription = "Listing photo",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(160.dp)
-                    )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(selectedPhotoUris) { uri ->
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = "Listing photo",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(120.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(Modifier.height(24.dp))
@@ -333,17 +379,20 @@ fun CreateListingScreen(nav: NavController) {
                                         photos = emptyList()
                                     )
                                     val newId = listingRepository.createListing(listing)
-                                    if (newId.isNotEmpty() && selectedPhotoUri != null) {
+                                    if (newId.isNotEmpty() && selectedPhotoUris.isNotEmpty()) {
                                         try {
-                                            val photoUrl = uploadCompressedImage(
-                                                context,
-                                                selectedPhotoUri!!,
-                                                "listing_uploads/$newId/cover.jpg"
-                                            )
-                                            if (photoUrl.isNotBlank()) {
+                                            val photoUrls = selectedPhotoUris.mapIndexedNotNull { index, uri ->
+                                                val photoUrl = uploadCompressedImage(
+                                                    context,
+                                                    uri,
+                                                    "listing_uploads/$newId/photo_$index.jpg"
+                                                )
+                                                photoUrl.takeIf { it.isNotBlank() }
+                                            }
+                                            if (photoUrls.isNotEmpty()) {
                                                 listingRepository.updateListing(
                                                     newId,
-                                                    mapOf("photos" to listOf(photoUrl))
+                                                    mapOf("photos" to photoUrls)
                                                 )
                                             }
                                         } catch (e: Exception) {

@@ -1,5 +1,7 @@
 package io.github.howshous.data.firestore
 
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import io.github.howshous.data.models.UserProfile
 import io.github.howshous.data.models.Listing
@@ -111,6 +113,57 @@ class ListingRepository {
     suspend fun updateListing(id: String, updates: Map<String, Any>) {
         try {
             db.collection("listings").document(id).update(updates).await()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    suspend fun backfillUniqueViewCountsForLandlord(landlordId: String): Int {
+        if (landlordId.isBlank()) return 0
+
+        return try {
+            val snap = db.collection("listings")
+                .whereEqualTo("landlordId", landlordId)
+                .get()
+                .await()
+
+            var updated = 0
+            for (doc in snap.documents) {
+                val viewsSnap = doc.reference.collection("views").get().await()
+                val count = viewsSnap.size()
+                val current = doc.getLong("uniqueViewCount")?.toInt() ?: 0
+                if (count != current) {
+                    doc.reference.update("uniqueViewCount", count).await()
+                    updated++
+                }
+            }
+            updated
+        } catch (e: Exception) {
+            e.printStackTrace()
+            0
+        }
+    }
+
+    suspend fun recordUniqueView(listingId: String, viewerId: String) {
+        if (listingId.isBlank() || viewerId.isBlank()) return
+
+        try {
+            val listingRef = db.collection("listings").document(listingId)
+            val viewRef = listingRef.collection("views").document(viewerId)
+
+            db.runTransaction { txn ->
+                val viewSnap = txn.get(viewRef)
+                if (!viewSnap.exists()) {
+                    txn.set(
+                        viewRef,
+                        mapOf(
+                            "viewerId" to viewerId,
+                            "viewedAt" to Timestamp.now()
+                        )
+                    )
+                    txn.update(listingRef, "uniqueViewCount", FieldValue.increment(1))
+                }
+            }.await()
         } catch (e: Exception) {
             e.printStackTrace()
         }

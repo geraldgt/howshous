@@ -26,7 +26,8 @@ data class Listing(
     val photos: List<String> = emptyList(),
     val amenities: List<String> = emptyList(),
     val createdAt: Timestamp? = null,
-    val updatedAt: Timestamp? = null
+    val updatedAt: Timestamp? = null,
+    val uniqueViewCount: Int = 0
 )
 
 data class Message(
