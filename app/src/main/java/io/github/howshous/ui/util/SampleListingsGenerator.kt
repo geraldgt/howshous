@@ -13,6 +13,7 @@ object SampleListingsGenerator {
         val location: String,
         val price: Int,
         val deposit: Int,
+        val capacity: Int,
         val status: String,
         val amenities: List<String>,
         val photos: List<String> = emptyList()
@@ -25,6 +26,7 @@ object SampleListingsGenerator {
             location = "Session Road",
             price = 4500,
             deposit = 9000,
+            capacity = 1,
             status = "active",
             amenities = listOf("WiFi", "Air Conditioning", "Furnished", "Near Public Transport", "Security")
         ),
@@ -34,6 +36,7 @@ object SampleListingsGenerator {
             location = "Baguio City Center",
             price = 8000,
             deposit = 16000,
+            capacity = 1,
             status = "active",
             amenities = listOf("Free Parking", "WiFi", "Air Conditioning", "Kitchen Access", "Laundry", "CCTV", "Security")
         ),
@@ -43,6 +46,7 @@ object SampleListingsGenerator {
             location = "Irisan",
             price = 3000,
             deposit = 6000,
+            capacity = 4,
             status = "active",
             amenities = listOf("WiFi", "Kitchen Access", "Laundry", "Security")
         ),
@@ -52,6 +56,7 @@ object SampleListingsGenerator {
             location = "Camp John Hay",
             price = 12000,
             deposit = 24000,
+            capacity = 1,
             status = "active",
             amenities = listOf("Free Parking", "WiFi", "Air Conditioning", "Gym Access", "Swimming Pool", "Furnished", "Security", "CCTV", "Kitchen Access", "Laundry")
         ),
@@ -61,6 +66,7 @@ object SampleListingsGenerator {
             location = "Burnham Park",
             price = 6000,
             deposit = 12000,
+            capacity = 2,
             status = "active",
             amenities = listOf("Pets Allowed", "Free Parking", "WiFi", "Air Conditioning", "Kitchen Access", "Laundry", "Security")
         ),
@@ -70,6 +76,7 @@ object SampleListingsGenerator {
             location = "Legarda Road",
             price = 3500,
             deposit = 7000,
+            capacity = 6,
             status = "active",
             amenities = listOf("WiFi", "Air Conditioning", "Security", "CCTV", "Near Public Transport")
         ),
@@ -79,6 +86,7 @@ object SampleListingsGenerator {
             location = "Aurora Hill",
             price = 9500,
             deposit = 19000,
+            capacity = 1,
             status = "active",
             amenities = listOf("WiFi", "Air Conditioning", "Furnished", "Kitchen Access", "Laundry", "Security", "CCTV")
         ),
@@ -88,6 +96,7 @@ object SampleListingsGenerator {
             location = "Lower Magsaysay",
             price = 5000,
             deposit = 10000,
+            capacity = 1,
             status = "active",
             amenities = listOf("WiFi", "Air Conditioning", "Near Public Transport", "Security", "Kitchen Access")
         ),
@@ -97,6 +106,7 @@ object SampleListingsGenerator {
             location = "Quezon Hill",
             price = 4000,
             deposit = 8000,
+            capacity = 3,
             status = "active",
             amenities = listOf("WiFi", "Kitchen Access", "Laundry", "Security", "Near Public Transport")
         ),
@@ -106,6 +116,7 @@ object SampleListingsGenerator {
             location = "Mines View Park",
             price = 15000,
             deposit = 30000,
+            capacity = 1,
             status = "active",
             amenities = listOf("Free Parking", "WiFi", "Air Conditioning", "Gym Access", "Swimming Pool", "Furnished", "Security", "CCTV", "Kitchen Access", "Laundry")
         )
@@ -131,6 +142,7 @@ object SampleListingsGenerator {
                     "location" to template.location,
                     "price" to template.price,
                     "deposit" to template.deposit,
+                    "capacity" to template.capacity,
                     "status" to template.status,
                     "amenities" to template.amenities,
                     "photos" to template.photos,

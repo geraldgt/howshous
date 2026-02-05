@@ -19,10 +19,15 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import coil.compose.AsyncImage
 import io.github.howshous.ui.data.readUidFlow
-import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.theme.DueYellow
+import io.github.howshous.ui.theme.InfoSurface
+import io.github.howshous.ui.theme.LandlordBlueAlt
+import io.github.howshous.ui.theme.NeutralSurface
 import io.github.howshous.ui.theme.OverdueRed
+import io.github.howshous.ui.theme.PendingSurface
 import io.github.howshous.ui.theme.PricePointGreen
+import io.github.howshous.ui.theme.SuccessSurface
+import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.theme.VacancyBlue
 import io.github.howshous.ui.viewmodels.HomeViewModel
 import io.github.howshous.ui.viewmodels.LandlordListingsViewModel
@@ -98,7 +103,7 @@ fun IssueCard(issue: io.github.howshous.data.models.Issue, onClick: () -> Unit) 
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = if (issue.status == "pending") Color(0xFFFFF9C4) else Color.White
+            containerColor = if (issue.status == "pending") PendingSurface else Color.White
         )
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -230,7 +235,11 @@ fun LandlordListings(nav: NavController) {
                     ) {
                         Button(
                             onClick = { nav.navigate("create_listing") },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = VacancyBlue,
+                                contentColor = Color.White
+                            )
                         ) { Text("Add Listing") }
                         Button(
                             onClick = {
@@ -253,7 +262,10 @@ fun LandlordListings(nav: NavController) {
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = LandlordBlueAlt,
+                                contentColor = Color.White
+                            )
                         ) { Text("Sample Data") }
                     }
                     Spacer(Modifier.height(8.dp))
@@ -272,6 +284,7 @@ fun LandlordListings(nav: NavController) {
                                 ListingCard(
                                     listing = listing,
                                     modifier = Modifier.fillMaxWidth(),
+                                    onClick = { nav.navigate("landlord_listing/${listing.id}") },
                                     showStatus = true,
                                     showViews = true
                                 )
@@ -282,7 +295,7 @@ fun LandlordListings(nav: NavController) {
                 1 -> {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9))
+                        colors = CardDefaults.cardColors(containerColor = SuccessSurface)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text("How to use analytics", style = MaterialTheme.typography.titleSmall)
@@ -374,7 +387,7 @@ fun LandlordListings(nav: NavController) {
                         if (metricsMap.isNotEmpty() && totalViews > 0) {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
+                                colors = CardDefaults.cardColors(containerColor = InfoSurface)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Text("Overall Performance (30d)", style = MaterialTheme.typography.titleSmall)
@@ -488,7 +501,7 @@ fun LandlordListings(nav: NavController) {
                                                 
                                                 if (insights.isNotEmpty()) {
                                                     Card(
-                                                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+                                                        colors = CardDefaults.cardColors(containerColor = NeutralSurface)
                                                     ) {
                                                         Column(modifier = Modifier.padding(8.dp)) {
                                                             Text("💡 Insights", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
@@ -620,7 +633,7 @@ fun LandlordNotifications(nav: NavController) {
                             .fillMaxWidth()
                             .padding(8.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (notif.read) SurfaceLight else Color(0xFFFFF9C4)
+                            containerColor = if (notif.read) SurfaceLight else PendingSurface
                         )
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {

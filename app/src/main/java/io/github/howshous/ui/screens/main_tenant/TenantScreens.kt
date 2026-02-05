@@ -16,12 +16,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.data.ensureSessionId
+import io.github.howshous.ui.theme.AlertOrange
+import io.github.howshous.ui.theme.ContractsBlue
+import io.github.howshous.ui.theme.SuccessSurface
 import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.viewmodels.HomeViewModel
 import io.github.howshous.ui.viewmodels.TenantSearchViewModel
@@ -72,7 +76,7 @@ fun TenantHome(nav: NavController) {
                 onClick = { nav.navigate("view_contracts") },
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF2196F3)
+                    containerColor = ContractsBlue
                 )
             ) {
                 Text("View Contracts", style = MaterialTheme.typography.labelSmall)
@@ -84,7 +88,7 @@ fun TenantHome(nav: NavController) {
                     onClick = { nav.navigate("report_issue") },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFF9800)
+                        containerColor = AlertOrange
                     )
                 ) {
                     Text("Report Issue", style = MaterialTheme.typography.labelSmall)
@@ -119,8 +123,7 @@ fun TenantHome(nav: NavController) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp),
-                            onClick = { nav.navigate("listing/${listing.id}") },
-                            showViews = true
+                            onClick = { nav.navigate("listing/${listing.id}") }
                         )
                     }
                 }
@@ -294,8 +297,7 @@ fun TenantSearch(nav: NavController) {
                                 )
                             }
                             nav.navigate("listing/${listing.id}")
-                        },
-                        showViews = true
+                        }
                     )
                 }
             }
@@ -312,7 +314,9 @@ fun TenantChatList(nav: NavController) {
     val chats by viewModel.chats.collectAsState()
     var listingsMap by remember { mutableStateOf<Map<String, io.github.howshous.data.models.Listing>>(emptyMap()) }
     val listingRepository = remember { io.github.howshous.data.firestore.ListingRepository() }
+    val tenancyRepository = remember { io.github.howshous.data.firestore.TenancyRepository() }
     val scope = rememberCoroutineScope()
+    var tenancyStatusMap by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     LaunchedEffect(uid) {
         if (uid.isNotEmpty()) viewModel.loadChatsForUser(uid)
@@ -329,6 +333,15 @@ fun TenantChatList(nav: NavController) {
                     }
                 }
                 listingsMap = map
+            }
+        }
+    }
+
+    LaunchedEffect(uid) {
+        if (uid.isNotEmpty()) {
+            scope.launch {
+                val tenancies = tenancyRepository.getTenanciesForTenant(uid)
+                tenancyStatusMap = tenancies.associate { it.listingId to it.status }
             }
         }
     }
@@ -351,6 +364,7 @@ fun TenantChatList(nav: NavController) {
                 items(chats) { chat ->
                     val listing = listingsMap[chat.listingId]
                     val listingTitle = listing?.title ?: "Listing #${chat.listingId}"
+                    val needsResign = tenancyStatusMap[chat.listingId] == "needs_resign"
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -362,7 +376,29 @@ fun TenantChatList(nav: NavController) {
                                 .fillMaxWidth()
                                 .padding(12.dp)
                         ) {
-                            Text(listingTitle, style = MaterialTheme.typography.titleSmall)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    listingTitle,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (needsResign) {
+                                    Surface(
+                                        color = AlertOrange,
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text(
+                                            "Re-sign required",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
                             Spacer(Modifier.height(4.dp))
                             Text(chat.lastMessage.take(50), style = MaterialTheme.typography.bodySmall)
                         }
@@ -406,7 +442,7 @@ fun TenantNotifications(nav: NavController) {
                             .fillMaxWidth()
                             .padding(8.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (notif.read) SurfaceLight else Color(0xFFE8F5E9)
+                            containerColor = if (notif.read) SurfaceLight else SuccessSurface
                         )
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {

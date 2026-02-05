@@ -19,6 +19,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.github.howshous.ui.components.DebouncedIconButton
+import io.github.howshous.ui.theme.AlertOrange
+import io.github.howshous.ui.theme.EmergencyRed
 import io.github.howshous.ui.theme.SurfaceLight
 
 @Composable
@@ -36,7 +38,7 @@ fun EmergencyScreen(nav: NavController) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFFFF5252))
+                .background(EmergencyRed)
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -69,7 +71,7 @@ fun EmergencyScreen(nav: NavController) {
                             context.startActivity(intent)
                         },
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFFF5252)
+                        containerColor = EmergencyRed
                     )
                 ) {
                     Column(
@@ -101,7 +103,7 @@ fun EmergencyScreen(nav: NavController) {
                         .fillMaxWidth()
                         .clickable { showInstructions = true },
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFFF9800)
+                        containerColor = AlertOrange
                     )
                 ) {
                     Column(

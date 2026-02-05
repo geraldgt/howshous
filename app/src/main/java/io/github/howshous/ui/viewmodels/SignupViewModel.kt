@@ -132,7 +132,8 @@ class SignupViewModel : ViewModel() {
                 "email" to email,
                 "role" to "tenant",
                 "verified" to false,
-                "profileImageUrl" to profileUrl
+                "profileImageUrl" to profileUrl,
+                "businessPermitUrl" to ""
             )
 
             db.collection("users").document(uid).set(userDoc).await()
@@ -213,7 +214,8 @@ class SignupViewModel : ViewModel() {
                 "email" to email,
                 "role" to "landlord",
                 "verified" to false,
-                "profileImageUrl" to profileUrl
+                "profileImageUrl" to profileUrl,
+                "businessPermitUrl" to propertyVerificationUrl
             )
 
             db.collection("users").document(uid).set(userDoc).await()

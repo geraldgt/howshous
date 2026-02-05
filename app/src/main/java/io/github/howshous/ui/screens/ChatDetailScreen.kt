@@ -2,21 +2,28 @@ package io.github.howshous.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import io.github.howshous.data.firestore.ListingRepository
 import io.github.howshous.ui.components.DebouncedIconButton
 import io.github.howshous.ui.data.readUidFlow
@@ -33,6 +40,7 @@ import io.github.howshous.ui.viewmodels.ChatViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.ui.geometry.Offset
 
 @Composable
 fun ChatDetailScreen(nav: NavController, chatId: String = "") {
@@ -45,13 +53,15 @@ fun ChatDetailScreen(nav: NavController, chatId: String = "") {
     val isLoading by viewModel.isLoading.collectAsState()
     var messageText by remember { mutableStateOf("") }
     var showContractDialog by remember { mutableStateOf<String?>(null) }
+    var showImageViewer by remember { mutableStateOf(false) }
+    var selectedImageUrl by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val listingRepository = remember { ListingRepository() }
     var listing by remember { mutableStateOf<io.github.howshous.data.models.Listing?>(null) }
 
-    LaunchedEffect(chatId) {
-        if (chatId.isNotEmpty()) {
-            viewModel.loadMessagesForChat(chatId)
+    LaunchedEffect(chatId, uid) {
+        if (chatId.isNotEmpty() && uid.isNotEmpty()) {
+            viewModel.loadMessagesForChat(chatId, uid)
         }
     }
 
@@ -64,6 +74,7 @@ fun ChatDetailScreen(nav: NavController, chatId: String = "") {
     }
 
     val isLandlord = currentChat?.landlordId == uid
+    val userAccentColor = if (isLandlord) LandlordBlue else TenantGreen
 
     Column(
         modifier = Modifier
@@ -126,15 +137,32 @@ fun ChatDetailScreen(nav: NavController, chatId: String = "") {
                             Card(
                                 modifier = Modifier.widthIn(max = 250.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = if (isUserMessage) TenantGreen else NearWhite
+                                    containerColor = if (isUserMessage) userAccentColor else NearWhite
                                 )
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(
-                                        message.text,
-                                        color = if (isUserMessage) Color.White else MaterialTheme.colorScheme.onSurface,
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
+                                    if (message.type == "image" && message.imageUrl.isNotBlank()) {
+                                        AsyncImage(
+                                            model = message.imageUrl,
+                                            contentDescription = message.text.ifBlank { "Image" },
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(160.dp)
+                                                .clickable {
+                                                    selectedImageUrl = message.imageUrl
+                                                    showImageViewer = true
+                                                }
+                                        )
+                                        Spacer(Modifier.height(6.dp))
+                                    }
+                                    if (message.text.isNotBlank()) {
+                                        Text(
+                                            message.text,
+                                            color = if (isUserMessage) Color.White else MaterialTheme.colorScheme.onSurface,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
                                     Spacer(Modifier.height(4.dp))
                                     Text(
                                         formatTime(message.timestamp),
@@ -159,7 +187,7 @@ fun ChatDetailScreen(nav: NavController, chatId: String = "") {
                 Button(
                     onClick = {
                         scope.launch {
-                            val contractId = viewModel.sendContract(
+                            viewModel.sendContract(
                                 chatId = chatId,
                                 listingId = listing!!.id,
                                 landlordId = uid,
@@ -207,7 +235,7 @@ fun ChatDetailScreen(nav: NavController, chatId: String = "") {
                 },
                 modifier = Modifier.size(40.dp)
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = TenantGreen)
+                Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = userAccentColor)
             }
         }
     }
@@ -227,6 +255,51 @@ fun ChatDetailScreen(nav: NavController, chatId: String = "") {
                     }
                 }
             )
+        }
+    }
+
+    if (showImageViewer && selectedImageUrl.isNotBlank()) {
+        var scale by remember { mutableStateOf(1f) }
+        var offset by remember { mutableStateOf(Offset.Zero) }
+        val transformableState = rememberTransformableState { zoomChange, panChange, _ ->
+            val newScale = (scale * zoomChange).coerceIn(1f, 5f)
+            scale = newScale
+            offset += panChange
+        }
+
+        Dialog(onDismissRequest = { showImageViewer = false }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                AsyncImage(
+                    model = selectedImageUrl,
+                    contentDescription = "Full image view",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offset.x,
+                            translationY = offset.y
+                        )
+                        .transformable(transformableState)
+                )
+                IconButton(
+                    onClick = { showImageViewer = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Close",
+                        tint = Color.White
+                    )
+                }
+            }
         }
     }
 }
@@ -268,6 +341,7 @@ fun ContractMessageCard(
                     color = when (contract.status) {
                         "signed" -> PricePointGreen
                         "pending" -> DueText
+                        "terminated" -> Color.Red
                         else -> slightlyGray
                     }
                 )

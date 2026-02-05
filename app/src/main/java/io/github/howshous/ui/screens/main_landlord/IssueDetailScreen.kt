@@ -27,6 +27,7 @@ import io.github.howshous.data.firestore.IssueRepository
 import io.github.howshous.data.firestore.ListingRepository
 import io.github.howshous.ui.components.DebouncedIconButton
 import io.github.howshous.ui.data.readUidFlow
+import io.github.howshous.ui.theme.PendingSurface
 import io.github.howshous.ui.theme.OverdueRed
 import io.github.howshous.ui.theme.PricePointGreen
 import io.github.howshous.ui.theme.SurfaceLight
@@ -140,7 +141,7 @@ fun IssueDetailScreen(nav: NavController, issueId: String) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (issue!!.status == "pending") Color(0xFFFFF9C4) else PricePointGreen
+                        containerColor = if (issue!!.status == "pending") PendingSurface else PricePointGreen
                     )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {

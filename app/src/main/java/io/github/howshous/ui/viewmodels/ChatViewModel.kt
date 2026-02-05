@@ -49,14 +49,14 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    fun loadMessagesForChat(chatId: String) {
+    fun loadMessagesForChat(chatId: String, userId: String) {
         viewModelScope.launch {
             _currentChatId.value = chatId
             _isLoading.value = true
             val messages = chatRepo.getMessagesForChat(chatId)
             _messages.value = messages
             loadChat(chatId)
-            loadContractsForChat(chatId)
+            loadContractsForChat(chatId, userId)
             _isLoading.value = false
         }
     }
@@ -64,37 +64,47 @@ class ChatViewModel : ViewModel() {
     fun sendMessage(chatId: String, senderId: String, text: String) {
         viewModelScope.launch {
             chatRepo.sendMessage(chatId, senderId, text)
-            loadMessagesForChat(chatId)
+            loadMessagesForChat(chatId, senderId)
         }
     }
 
-    fun loadContractsForChat(chatId: String) {
+    fun loadContractsForChat(chatId: String, userId: String) {
         viewModelScope.launch {
-            val contracts = contractRepo.getContractsForChat(chatId)
+            val contracts = contractRepo.getContractsForChat(chatId, userId)
             _contracts.value = contracts
         }
     }
 
-    fun sendContract(chatId: String, listingId: String, landlordId: String, tenantId: String, monthlyRent: Int, deposit: Int): String {
-        var contractId = ""
-        viewModelScope.launch {
-            val contract = Contract(
-                chatId = chatId,
-                listingId = listingId,
-                landlordId = landlordId,
-                tenantId = tenantId,
-                title = "Rental Agreement",
-                terms = generatePlaceholderContract(monthlyRent, deposit),
-                monthlyRent = monthlyRent,
-                deposit = deposit,
-                status = "pending"
-            )
-            contractId = contractRepo.createContract(contract)
-            if (contractId.isNotEmpty()) {
-                // Send contract as a message
-                chatRepo.sendMessage(chatId, landlordId, "📄 Contract sent. Please review and sign.")
-                loadMessagesForChat(chatId)
-            }
+    suspend fun sendContract(
+        chatId: String,
+        listingId: String,
+        landlordId: String,
+        tenantId: String,
+        monthlyRent: Int,
+        deposit: Int
+    ): String {
+        if (landlordId.isBlank() || chatId.isBlank() || listingId.isBlank()) return ""
+        var resolvedTenantId = tenantId
+        if (resolvedTenantId.isBlank()) {
+            val chat = chatRepo.getChat(chatId)
+            resolvedTenantId = chat?.tenantId ?: ""
+        }
+        if (resolvedTenantId.isBlank()) return ""
+        val fallbackTerms = generatePlaceholderContract(monthlyRent, deposit)
+        val contractId = contractRepo.createContractFromListingTemplate(
+            listingId = listingId,
+            chatId = chatId,
+            landlordId = landlordId,
+            tenantId = resolvedTenantId,
+            fallbackTitle = "Rental Agreement",
+            fallbackTerms = fallbackTerms,
+            fallbackMonthlyRent = monthlyRent,
+            fallbackDeposit = deposit
+        )
+        if (contractId.isNotEmpty()) {
+            // Send contract as a message
+            chatRepo.sendMessage(chatId, landlordId, "Contract sent. Please review and sign.")
+            loadMessagesForChat(chatId, landlordId)
         }
         return contractId
     }
@@ -105,10 +115,10 @@ class ChatViewModel : ViewModel() {
             if (success) {
                 val contract = contractRepo.getContract(contractId)
                 contract?.let {
-                    loadContractsForChat(it.chatId)
+                    loadContractsForChat(it.chatId, it.tenantId)
                     // Send confirmation message
-                    chatRepo.sendMessage(it.chatId, it.tenantId, "✅ Contract signed!")
-                    loadMessagesForChat(it.chatId)
+                    chatRepo.sendMessage(it.chatId, it.tenantId, "Contract signed!")
+                    loadMessagesForChat(it.chatId, it.tenantId)
                 }
             }
         }
@@ -117,11 +127,11 @@ class ChatViewModel : ViewModel() {
     private fun generatePlaceholderContract(monthlyRent: Int, deposit: Int): String {
         return """
             RENTAL AGREEMENT FOR BOARDING HOUSE
-            
+
             TERMS AND CONDITIONS:
-            
-            1. RENTAL AMOUNT: ₱$monthlyRent per month
-            2. SECURITY DEPOSIT: ₱$deposit (refundable upon termination)
+
+            1. RENTAL AMOUNT: PHP $monthlyRent per month
+            2. SECURITY DEPOSIT: PHP $deposit (refundable upon termination)
             3. PAYMENT TERMS: Monthly rent due on the 1st of each month
             4. DURATION: 12 months (renewable)
             5. UTILITIES: Included in rent (subject to fair usage policy)
@@ -132,7 +142,7 @@ class ChatViewModel : ViewModel() {
                - No pets without prior approval
             7. TERMINATION: 30 days written notice required
             8. DAMAGES: Tenant responsible for any damages beyond normal wear
-            
+
             By signing this contract, both parties agree to the terms stated above.
         """.trimIndent()
     }

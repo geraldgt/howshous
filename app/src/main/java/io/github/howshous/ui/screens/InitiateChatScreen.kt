@@ -1,6 +1,5 @@
 package io.github.howshous.ui.screens
 
-import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -10,18 +9,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import io.github.howshous.data.firestore.ChatRepository
-import io.github.howshous.data.models.Chat
+import io.github.howshous.data.firestore.UserRepository
 import io.github.howshous.ui.components.DebouncedIconButton
 import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.theme.InputShape
 import io.github.howshous.ui.theme.inputColors
-import io.github.howshous.ui.viewmodels.ChatViewModel
 import io.github.howshous.ui.data.readUidFlow
-import com.google.firebase.Timestamp
 import kotlinx.coroutines.launch
 
 @Composable
@@ -31,8 +29,30 @@ fun InitiateChatScreen(nav: NavController, listingId: String = "", landlordId: S
     var message by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+    var attachIdCard by remember { mutableStateOf(false) }
+    var idCardUrl by remember { mutableStateOf("") }
+    var isFirstContact by remember { mutableStateOf(true) }
 
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(uid, listingId, landlordId) {
+        if (uid.isBlank()) return@LaunchedEffect
+        val chatRepository = ChatRepository()
+        val existingChatId = chatRepository.getExistingChatIdForListing(
+            listingId = listingId,
+            tenantId = uid,
+            landlordId = landlordId
+        )
+        isFirstContact = existingChatId.isBlank() || !chatRepository.hasMessages(existingChatId)
+
+        if (isFirstContact) {
+            val userRepository = UserRepository()
+            idCardUrl = userRepository.getVerificationIdUrl(uid)
+        } else {
+            idCardUrl = ""
+            attachIdCard = false
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -75,6 +95,44 @@ fun InitiateChatScreen(nav: NavController, listingId: String = "", landlordId: S
                 maxLines = 5
             )
 
+            Spacer(Modifier.height(16.dp))
+            if (isFirstContact) {
+                Text("Optional: Attach your ID card", style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = attachIdCard,
+                        onCheckedChange = { attachIdCard = it }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Attach ID?")
+                }
+
+                if (attachIdCard) {
+                    if (idCardUrl.isNotBlank()) {
+                        Spacer(Modifier.height(12.dp))
+                        AsyncImage(
+                            model = idCardUrl,
+                            contentDescription = "ID card preview",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                        )
+                    } else {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "No ID on file. Please upload a valid ID in your profile.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+
             if (errorMessage.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
                 Text(errorMessage, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -92,40 +150,30 @@ fun InitiateChatScreen(nav: NavController, listingId: String = "", landlordId: S
                         errorMessage = "Message cannot be empty"
                         return@Button
                     }
+                    if (isFirstContact && attachIdCard && idCardUrl.isBlank()) {
+                        errorMessage = "No ID on file. Please upload a valid ID in your profile."
+                        return@Button
+                    }
 
                     isLoading = true
                     scope.launch {
                         try {
                             val chatRepository = ChatRepository()
-                            
-                            // Try to find existing chat or create new one
-                            val chats = chatRepository.getChatsForUser(uid)
-                            val existingChat = chats.find { 
-                                it.listingId == listingId && 
-                                it.tenantId == uid && 
-                                it.landlordId == landlordId
-                            }
-
-                            val chatId = if (existingChat != null) {
-                                // Send message to existing chat
-                                chatRepository.sendMessage(existingChat.id, uid, message)
-                                existingChat.id
-                            } else {
-                                // Create new chat
-                                val newChat = Chat(
-                                    id = "", // Firestore will generate
-                                    listingId = listingId,
-                                    tenantId = uid,
-                                    landlordId = landlordId,
-                                    lastMessage = message,
-                                    lastTimestamp = Timestamp.now()
-                                )
-                                val createdChatId = chatRepository.createChat(newChat)
-                                // Send initial message
-                                if (createdChatId.isNotEmpty()) {
-                                    chatRepository.sendMessage(createdChatId, uid, message)
+                            val chatId = chatRepository.getOrCreateChatForListing(
+                                listingId = listingId,
+                                tenantId = uid,
+                                landlordId = landlordId
+                            )
+                            if (chatId.isNotEmpty()) {
+                                chatRepository.sendMessage(chatId, uid, message)
+                                if (isFirstContact && attachIdCard && idCardUrl.isNotBlank()) {
+                                    chatRepository.sendImageMessage(
+                                        chatId = chatId,
+                                        senderId = uid,
+                                        imageUrl = idCardUrl,
+                                        label = "ID Card"
+                                    )
                                 }
-                                createdChatId
                             }
 
                             if (chatId.isNotEmpty()) {

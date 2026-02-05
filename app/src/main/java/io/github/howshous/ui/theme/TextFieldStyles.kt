@@ -12,7 +12,7 @@ val InputPlaceholder = Color(0xFF7D7D7D)
 val InputShape = RoundedCornerShape(16)
 
 @Composable
-fun inputColors() = TextFieldDefaults.colors(
+fun inputColors(accentColor: Color? = null) = TextFieldDefaults.colors(
     focusedContainerColor = InputBackground,
     unfocusedContainerColor = InputBackground,
     disabledContainerColor = InputBackground,
@@ -23,7 +23,10 @@ fun inputColors() = TextFieldDefaults.colors(
     disabledIndicatorColor = Color.Transparent,
     errorIndicatorColor = Color.Transparent,
 
-    cursorColor = Color.Black,
+    cursorColor = accentColor ?: Color.Black,
+    focusedLabelColor = accentColor ?: Color.Unspecified,
+    focusedLeadingIconColor = accentColor ?: Color.Unspecified,
+    focusedTrailingIconColor = accentColor ?: Color.Unspecified,
     focusedPlaceholderColor = InputPlaceholder,
     unfocusedPlaceholderColor = InputPlaceholder
 )

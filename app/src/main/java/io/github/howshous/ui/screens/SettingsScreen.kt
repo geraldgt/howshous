@@ -13,8 +13,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import io.github.howshous.data.auth.AuthRepository
 import io.github.howshous.ui.components.DebouncedIconButton
-import io.github.howshous.ui.data.clearSession
 import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.viewmodels.AccountViewModel
@@ -95,9 +95,9 @@ fun SettingsScreen(nav: NavController) {
             Button(
                 onClick = {
                     scope.launch {
-                        clearSession(context)
-                        nav.navigate("login") {
-                            popUpTo("tenant_dashboard") { inclusive = true }
+                        AuthRepository(context).logout()
+                        nav.navigate("login_choice") {
+                            popUpTo("splash") { inclusive = true }
                         }
                     }
                 },

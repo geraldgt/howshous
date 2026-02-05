@@ -11,6 +11,12 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/listings/$(listingId)).data.landlordId == request.auth.uid;
     }
 
+    function listingBelongsToLandlord(listingId, landlordId) {
+      return listingId != null
+        && landlordId != null
+        && get(/databases/$(database)/documents/listings/$(listingId)).data.landlordId == landlordId;
+    }
+
     function isUniqueViewIncrement() {
       let currentViews = resource.data.uniqueViewCount is int ? resource.data.uniqueViewCount : 0;
       let changedKeys = request.resource.data.diff(resource.data).changedKeys();
@@ -49,7 +55,8 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSignedIn()
+        && (request.auth.uid == userId || resource.data.role == "landlord");
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isSignedIn() && request.auth.uid == userId;
       allow delete: if false;
@@ -75,7 +82,8 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.tenantId == request.auth.uid
         && request.resource.data.landlordId != null
-        && request.resource.data.listingId != null;
+        && request.resource.data.listingId != null
+        && listingBelongsToLandlord(request.resource.data.listingId, request.resource.data.landlordId);
       allow read, update: if isSignedIn()
         && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid);
       allow delete: if false;
@@ -94,27 +102,64 @@ service cloud.firestore {
 
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn()
+        && (
+          request.resource.data.userId == request.auth.uid
+          || (request.resource.data.listingId != null && isLandlordForListing(request.resource.data.listingId))
+        );
       allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow delete: if false;
     }
 
     match /contracts/{contractId} {
       allow read: if isSignedIn()
-        && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid);
+        && (
+          (resource.data.keys().hasAll(["tenantId", "landlordId"])
+            && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid))
+          || (
+            resource.data.chatId != null
+            && isChatParticipant(get(/databases/$(database)/documents/chats/$(resource.data.chatId)).data)
+          )
+        );
       allow create: if isSignedIn()
-        && (request.resource.data.tenantId == request.auth.uid || request.resource.data.landlordId == request.auth.uid);
+        && request.auth.uid == request.resource.data.landlordId
+        && request.resource.data.listingId != null
+        && request.resource.data.chatId != null
+        && request.resource.data.tenantId is string
+        && request.resource.data.tenantId.size() > 0
+        && listingBelongsToLandlord(request.resource.data.listingId, request.resource.data.landlordId)
+        && get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data.listingId == request.resource.data.listingId;
       allow update: if isSignedIn()
-        && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid);
+        && resource.data.keys().hasAll(["tenantId", "landlordId"])
+        && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid)
+        && listingBelongsToLandlord(resource.data.listingId, resource.data.landlordId);
       allow delete: if false;
     }
 
     match /issues/{issueId} {
       allow read: if isSignedIn()
         && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.tenantId == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.tenantId == request.auth.uid
+        && request.resource.data.contractId != null
+        && request.resource.data.listingId != null
+        && request.resource.data.chatId != null
+        && get(/databases/$(database)/documents/contracts/$(request.resource.data.contractId)).data.listingId == request.resource.data.listingId
+        && get(/databases/$(database)/documents/contracts/$(request.resource.data.contractId)).data.landlordId == request.resource.data.landlordId
+        && get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data.listingId == request.resource.data.listingId;
       allow update: if isSignedIn()
         && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid);
+      allow delete: if false;
+    }
+
+    match /tenancies/{tenancyId} {
+      allow read: if isSignedIn()
+        && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid);
+      allow create, update: if isSignedIn()
+        && (request.resource.data.tenantId == request.auth.uid || request.resource.data.landlordId == request.auth.uid)
+        && listingBelongsToLandlord(request.resource.data.listingId, request.resource.data.landlordId)
+        && request.resource.data.contractId != null
+        && get(/databases/$(database)/documents/contracts/$(request.resource.data.contractId)).data.listingId == request.resource.data.listingId;
       allow delete: if false;
     }
 

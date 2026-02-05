@@ -8,6 +8,52 @@ import kotlinx.coroutines.tasks.await
 class ContractRepository {
     private val db = FirebaseFirestore.getInstance()
 
+    suspend fun createContractFromListingTemplate(
+        listingId: String,
+        chatId: String,
+        landlordId: String,
+        tenantId: String,
+        fallbackTitle: String,
+        fallbackTerms: String,
+        fallbackMonthlyRent: Int,
+        fallbackDeposit: Int
+    ): String {
+        return try {
+            if (tenantId.isBlank() || landlordId.isBlank() || listingId.isBlank() || chatId.isBlank()) {
+                return ""
+            }
+            val listingDoc = db.collection("listings").document(listingId).get().await()
+            val template = listingDoc.get("contractTemplate") as? Map<String, Any>
+
+            val monthlyRent = (template?.get("monthlyRent") as? Number)?.toInt() ?: fallbackMonthlyRent
+            val deposit = (template?.get("deposit") as? Number)?.toInt() ?: fallbackDeposit
+            val title = template?.get("title") as? String ?: fallbackTitle
+            val terms = template?.get("terms") as? String ?: fallbackTerms
+            val startDate = template?.get("startDate") as? Timestamp
+            val endDate = template?.get("endDate") as? Timestamp
+
+            val contractMap = hashMapOf<String, Any>(
+                "chatId" to chatId,
+                "listingId" to listingId,
+                "landlordId" to landlordId,
+                "tenantId" to tenantId,
+                "title" to title,
+                "terms" to terms,
+                "monthlyRent" to monthlyRent,
+                "deposit" to deposit,
+                "startDate" to (startDate ?: Timestamp.now()),
+                "endDate" to (endDate ?: Timestamp.now()),
+                "status" to "pending",
+                "createdAt" to Timestamp.now()
+            )
+            val docRef = db.collection("contracts").add(contractMap).await()
+            docRef.id
+        } catch (e: Exception) {
+            e.printStackTrace()
+            ""
+        }
+    }
+
     suspend fun createContract(contract: Contract): String {
         return try {
             val contractMap = hashMapOf<String, Any>(
@@ -60,10 +106,60 @@ class ContractRepository {
 
     suspend fun signContract(contractId: String): Boolean {
         return try {
-            db.collection("contracts").document(contractId).update(
+            val contractRef = db.collection("contracts").document(contractId)
+            val snap = contractRef.get().await()
+            val listingId = snap.getString("listingId") ?: ""
+            val tenantId = snap.getString("tenantId") ?: ""
+            val landlordId = snap.getString("landlordId") ?: ""
+            val tenantProfile = if (tenantId.isNotBlank()) {
+                db.collection("users").document(tenantId).get().await()
+            } else {
+                null
+            }
+            val tenantName = if (tenantProfile != null && tenantProfile.exists()) {
+                val first = tenantProfile.getString("firstName").orEmpty().trim()
+                val last = tenantProfile.getString("lastName").orEmpty().trim()
+                listOf(first, last).filter { it.isNotBlank() }.joinToString(" ")
+            } else {
+                ""
+            }
+
+            contractRef.update(
                 mapOf(
                     "status" to "signed",
                     "signedAt" to Timestamp.now()
+                )
+            ).await()
+
+            if (listingId.isNotBlank() && tenantId.isNotBlank() && landlordId.isNotBlank()) {
+                val tenancyId = "${listingId}_$tenantId"
+                val tenancyData = mapOf(
+                    "listingId" to listingId,
+                    "tenantId" to tenantId,
+                    "tenantName" to tenantName,
+                    "landlordId" to landlordId,
+                    "contractId" to contractId,
+                    "status" to "signed",
+                    "createdAt" to Timestamp.now(),
+                    "updatedAt" to Timestamp.now()
+                )
+                db.collection("tenancies").document(tenancyId).set(tenancyData).await()
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun terminateContract(contractId: String, terminatedBy: String): Boolean {
+        return try {
+            if (contractId.isBlank()) return false
+            db.collection("contracts").document(contractId).update(
+                mapOf(
+                    "status" to "terminated",
+                    "terminatedAt" to Timestamp.now(),
+                    "terminatedBy" to terminatedBy
                 )
             ).await()
             true
@@ -73,15 +169,24 @@ class ContractRepository {
         }
     }
 
-    suspend fun getContractsForChat(chatId: String): List<Contract> {
+    suspend fun getContractsForChat(chatId: String, userId: String): List<Contract> {
         return try {
-            val snap = db.collection("contracts")
+            if (chatId.isBlank() || userId.isBlank()) return emptyList()
+
+            val tenantSnap = db.collection("contracts")
                 .whereEqualTo("chatId", chatId)
-                .orderBy("createdAt")
+                .whereEqualTo("tenantId", userId)
                 .get()
                 .await()
-            
-            snap.documents.mapNotNull { doc ->
+
+            val landlordSnap = db.collection("contracts")
+                .whereEqualTo("chatId", chatId)
+                .whereEqualTo("landlordId", userId)
+                .get()
+                .await()
+
+            val docs = (tenantSnap.documents + landlordSnap.documents).distinctBy { it.id }
+            val contracts = docs.mapNotNull { doc ->
                 val data = doc.data ?: return@mapNotNull null
                 Contract(
                     id = doc.id,
@@ -100,6 +205,7 @@ class ContractRepository {
                     createdAt = data["createdAt"] as? Timestamp
                 )
             }
+            contracts.sortedByDescending { it.createdAt?.seconds ?: 0L }
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
@@ -153,6 +259,39 @@ class ContractRepository {
         } catch (e: Exception) {
             e.printStackTrace()
             false
+        }
+    }
+
+    suspend fun getSignedContractForTenantAndListing(tenantId: String, listingId: String): Contract? {
+        return try {
+            val snap = db.collection("contracts")
+                .whereEqualTo("tenantId", tenantId)
+                .whereEqualTo("listingId", listingId)
+                .whereEqualTo("status", "signed")
+                .limit(1)
+                .get()
+                .await()
+            val doc = snap.documents.firstOrNull() ?: return null
+            val data = doc.data ?: return null
+            Contract(
+                id = doc.id,
+                chatId = data["chatId"] as? String ?: "",
+                listingId = data["listingId"] as? String ?: "",
+                landlordId = data["landlordId"] as? String ?: "",
+                tenantId = data["tenantId"] as? String ?: "",
+                title = data["title"] as? String ?: "",
+                terms = data["terms"] as? String ?: "",
+                monthlyRent = (data["monthlyRent"] as? Number)?.toInt() ?: 0,
+                deposit = (data["deposit"] as? Number)?.toInt() ?: 0,
+                startDate = data["startDate"] as? Timestamp,
+                endDate = data["endDate"] as? Timestamp,
+                status = data["status"] as? String ?: "pending",
+                signedAt = data["signedAt"] as? Timestamp,
+                createdAt = data["createdAt"] as? Timestamp
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 }

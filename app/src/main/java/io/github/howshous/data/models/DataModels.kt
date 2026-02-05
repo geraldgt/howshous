@@ -11,6 +11,7 @@ data class UserProfile(
     val role: String = "tenant",
     val verified: Boolean = false,
     val profileImageUrl: String = "",
+    val businessPermitUrl: String = "",
     val createdAt: Timestamp? = null
 )
 
@@ -22,12 +23,15 @@ data class Listing(
     val location: String = "",
     val price: Int = 0,
     val deposit: Int = 0,
+    val capacity: Int = 1,
     val status: String = "active", // active, full, maintenance
     val photos: List<String> = emptyList(),
     val amenities: List<String> = emptyList(),
+    val landDeedUrl: String = "",
     val createdAt: Timestamp? = null,
     val updatedAt: Timestamp? = null,
-    val uniqueViewCount: Int = 0
+    val uniqueViewCount: Int = 0,
+    val contractTemplate: Map<String, Any>? = null
 )
 
 data class Message(
@@ -36,8 +40,9 @@ data class Message(
     val senderId: String = "",
     val text: String = "",
     val timestamp: Timestamp? = null,
-    val type: String = "text", // "text", "contract"
-    val contractId: String = "" // Only used when type is "contract"
+    val type: String = "text", // "text", "contract", "image"
+    val contractId: String = "", // Only used when type is "contract"
+    val imageUrl: String = "" // Only used when type is "image"
 )
 
 data class Contract(
@@ -52,7 +57,7 @@ data class Contract(
     val deposit: Int = 0,
     val startDate: Timestamp? = null,
     val endDate: Timestamp? = null,
-    val status: String = "pending", // "pending", "signed", "rejected"
+    val status: String = "pending", // "pending", "signed", "rejected", "terminated"
     val signedAt: Timestamp? = null,
     val createdAt: Timestamp? = null
 )
@@ -74,7 +79,9 @@ data class Notification(
     val message: String = "",
     val read: Boolean = false,
     val timestamp: Timestamp? = null,
-    val actionUrl: String = ""
+    val actionUrl: String = "",
+    val listingId: String = "",
+    val senderId: String = ""
 )
 
 data class Rental(
@@ -87,6 +94,18 @@ data class Rental(
     val nextDueDate: Timestamp? = null,
     val status: String = "active",
     val monthlyRent: Int = 0
+)
+
+data class Tenancy(
+    val id: String = "",
+    val listingId: String = "",
+    val tenantId: String = "",
+    val tenantName: String = "",
+    val landlordId: String = "",
+    val contractId: String = "",
+    val status: String = "signed", // signed, confirmed, needs_resign, ended
+    val createdAt: Timestamp? = null,
+    val updatedAt: Timestamp? = null
 )
 
 data class Issue(

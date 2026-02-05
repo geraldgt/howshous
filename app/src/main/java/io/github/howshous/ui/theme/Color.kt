@@ -36,6 +36,18 @@ val OverdueText = Color(0xFFDC2626)
 // Misc Pallete
 val PricePointGreen = Color(0xFF157D17)
 
+// Status & alerts
+val EmergencyRed = Color(0xFFFF5252)
+val AlertOrange = Color(0xFFFF9800)
+val PendingSurface = Color(0xFFFFF9C4)
+val WarningSurface = Color(0xFFFFF3CD)
+val SuccessSurface = Color(0xFFE8F5E9)
+val InfoSurface = Color(0xFFE3F2FD)
+val NeutralSurface = Color(0xFFF5F5F5)
+
+// Tenant actions
+val ContractsBlue = Color(0xFF2196F3)
+
 // Greys
 val MutedGray = Color(0xFFD9D9D9)
 val lighterGray = Color(0xFFBCBCBC)

@@ -27,12 +27,15 @@ import io.github.howshous.ui.screens.ChatDetailScreen
 import io.github.howshous.ui.screens.EditProfileScreen
 import io.github.howshous.ui.screens.ChangePasswordScreen
 import io.github.howshous.ui.screens.CreateListingScreen
+import io.github.howshous.ui.screens.EditListingScreen
 import io.github.howshous.ui.screens.InitiateChatScreen
+import io.github.howshous.ui.screens.LandlordProfileScreen
 import io.github.howshous.ui.screens.ListingDetailScreen
 import io.github.howshous.ui.screens.main_tenant.TenantAIHelperScreen
 import io.github.howshous.ui.screens.main_tenant.ViewContractsScreen
 import io.github.howshous.ui.screens.main_tenant.EmergencyScreen
 import io.github.howshous.ui.screens.main_tenant.ReportIssueScreen
+import io.github.howshous.ui.screens.main_landlord.LandlordListingDetail
 import io.github.howshous.ui.viewmodels.SignupViewModel
 
 @Composable
@@ -81,10 +84,19 @@ fun HowsHousApp(nav: NavHostController = rememberNavController()) {
         composable("change_password") { ChangePasswordScreen(nav) }
 
         composable("create_listing") { CreateListingScreen(nav) }
+        composable("edit_listing/{listingId}") { backStackEntry ->
+            val listingId = backStackEntry.arguments?.getString("listingId") ?: ""
+            EditListingScreen(nav, listingId)
+        }
 
         composable("listing/{listingId}") { backStackEntry ->
             val listingId = backStackEntry.arguments?.getString("listingId") ?: ""
             ListingDetailScreen(nav, listingId)
+        }
+
+        composable("landlord_profile/{landlordId}") { backStackEntry ->
+            val landlordId = backStackEntry.arguments?.getString("landlordId") ?: ""
+            LandlordProfileScreen(nav, landlordId)
         }
 
         composable("tenant_ai_helper") {
@@ -117,6 +129,11 @@ fun HowsHousApp(nav: NavHostController = rememberNavController()) {
         composable("issue_detail/{issueId}") { backStackEntry ->
             val issueId = backStackEntry.arguments?.getString("issueId") ?: ""
             io.github.howshous.ui.screens.main_landlord.IssueDetailScreen(nav, issueId)
+        }
+
+        composable("landlord_listing/{listingId}") { backStackEntry ->
+            val listingId = backStackEntry.arguments?.getString("listingId") ?: ""
+            LandlordListingDetail(nav, listingId)
         }
     }
 }

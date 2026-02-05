@@ -8,7 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import io.github.howshous.ui.data.clearSession
+import io.github.howshous.data.auth.AuthRepository
 import io.github.howshous.ui.data.readRoleFlow
 import io.github.howshous.ui.data.readUidFlow
 import kotlinx.coroutines.launch
@@ -41,9 +41,9 @@ fun TenantDashboard(nav: NavController) {
         Button(
             onClick = {
                 scope.launch {
-                    clearSession(context)
-                    nav.navigate("login") {
-                        popUpTo("login") { inclusive = true }
+                    AuthRepository(context).logout()
+                    nav.navigate("login_choice") {
+                        popUpTo("splash") { inclusive = true }
                     }
                 }
             }

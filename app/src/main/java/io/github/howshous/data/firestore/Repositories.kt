@@ -3,6 +3,7 @@ package io.github.howshous.data.firestore
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import io.github.howshous.data.models.UserProfile
 import io.github.howshous.data.models.Listing
 import io.github.howshous.data.models.Chat
@@ -19,12 +20,16 @@ class UserRepository {
             val doc = db.collection("users").document(uid).get().await()
             val profile = doc.toObject(UserProfile::class.java)?.copy(uid = doc.id) ?: return null
 
-            val verificationDoc = db.collection("verifications").document(uid).get().await()
-            val status = verificationDoc.getString("status")?.lowercase()
-            val verifiedFlag = verificationDoc.getBoolean("verified") ?: false
+            val verificationDoc = try {
+                db.collection("verifications").document(uid).get().await()
+            } catch (_: Exception) {
+                null
+            }
+            val status = verificationDoc?.getString("status")?.lowercase()
+            val verifiedFlag = verificationDoc?.getBoolean("verified") ?: false
             val isVerified = verifiedFlag || status == "approved" || status == "verified" || status == "accepted"
 
-            if (isVerified && !profile.verified) {
+            if (verificationDoc != null && isVerified && !profile.verified) {
                 db.collection("users").document(uid).update("verified", true).await()
                 return profile.copy(verified = true)
             }
@@ -41,6 +46,16 @@ class UserRepository {
             db.collection("users").document(uid).update(updates).await()
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    suspend fun getVerificationIdUrl(uid: String): String {
+        return try {
+            val doc = db.collection("verifications").document(uid).get().await()
+            doc.getString("idUrl") ?: ""
+        } catch (e: Exception) {
+            e.printStackTrace()
+            ""
         }
     }
 }
@@ -102,8 +117,13 @@ class ListingRepository {
 
     suspend fun createListing(listing: Listing): String {
         return try {
-            val ref = db.collection("listings").add(listing.copy(id = "")).await()
-            ref.id
+            if (listing.id.isNotBlank()) {
+                db.collection("listings").document(listing.id).set(listing.copy(id = "")).await()
+                listing.id
+            } else {
+                val ref = db.collection("listings").add(listing.copy(id = "")).await()
+                ref.id
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             ""
@@ -223,7 +243,8 @@ class ChatRepository {
                 senderId = senderId,
                 text = text,
                 chatId = chatId,
-                timestamp = timestamp
+                timestamp = timestamp,
+                type = "text"
             )
             val chatRef = db.collection("chats").document(chatId)
             val messagesRef = chatRef.collection("messages")
@@ -259,6 +280,122 @@ class ChatRepository {
         }
     }
 
+    suspend fun getExistingChatIdForListing(
+        listingId: String,
+        tenantId: String,
+        landlordId: String
+    ): String {
+        return try {
+            val existing = db.collection("chats")
+                .whereEqualTo("listingId", listingId)
+                .whereEqualTo("tenantId", tenantId)
+                .whereEqualTo("landlordId", landlordId)
+                .limit(1)
+                .get()
+                .await()
+            if (!existing.isEmpty) {
+                existing.documents[0].id
+            } else {
+                ""
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            ""
+        }
+    }
+
+    suspend fun hasMessages(chatId: String): Boolean {
+        return try {
+            val snap = db.collection("chats").document(chatId).collection("messages")
+                .limit(1)
+                .get()
+                .await()
+            !snap.isEmpty
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun sendImageMessage(
+        chatId: String,
+        senderId: String,
+        imageUrl: String,
+        label: String = "Image"
+    ) {
+        if (imageUrl.isBlank()) return
+        try {
+            val timestamp = com.google.firebase.Timestamp.now()
+            val message = Message(
+                senderId = senderId,
+                text = label,
+                chatId = chatId,
+                timestamp = timestamp,
+                type = "image",
+                imageUrl = imageUrl
+            )
+            val chatRef = db.collection("chats").document(chatId)
+            val messagesRef = chatRef.collection("messages")
+
+            val existingMessages = messagesRef.limit(1).get().await()
+            val isFirstMessageInChat = existingMessages.isEmpty
+
+            messagesRef.add(message).await()
+            chatRef.update(
+                mapOf(
+                    "lastMessage" to label,
+                    "lastTimestamp" to timestamp
+                )
+            ).await()
+
+            if (isFirstMessageInChat) {
+                val chatDoc = chatRef.get().await()
+                val listingId = chatDoc.getString("listingId") ?: ""
+                val landlordId = chatDoc.getString("landlordId") ?: ""
+                analyticsRepo.logMessageSent(
+                    chatId = chatId,
+                    listingId = listingId,
+                    landlordId = landlordId,
+                    senderId = senderId
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    suspend fun getOrCreateChatForListing(
+        listingId: String,
+        tenantId: String,
+        landlordId: String
+    ): String {
+        return try {
+            val existing = db.collection("chats")
+                .whereEqualTo("listingId", listingId)
+                .whereEqualTo("tenantId", tenantId)
+                .whereEqualTo("landlordId", landlordId)
+                .limit(1)
+                .get()
+                .await()
+            if (!existing.isEmpty) {
+                return existing.documents[0].id
+            }
+
+            val chat = Chat(
+                id = "",
+                listingId = listingId,
+                tenantId = tenantId,
+                landlordId = landlordId,
+                lastMessage = "",
+                lastTimestamp = Timestamp.now()
+            )
+            createChat(chat)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            ""
+        }
+    }
+
     suspend fun createChat(chat: Chat): String {
         return try {
             val docRef = db.collection("chats").add(chat).await()
@@ -282,6 +419,33 @@ class ChatRepository {
 
 class NotificationRepository {
     private val db = FirebaseFirestore.getInstance()
+
+    suspend fun createNotification(
+        userId: String,
+        type: String,
+        title: String,
+        message: String,
+        actionUrl: String,
+        listingId: String? = null,
+        senderId: String? = null
+    ) {
+        try {
+            val data = mutableMapOf<String, Any>(
+                "userId" to userId,
+                "type" to type,
+                "title" to title,
+                "message" to message,
+                "read" to false,
+                "timestamp" to Timestamp.now(),
+                "actionUrl" to actionUrl
+            )
+            if (!listingId.isNullOrBlank()) data["listingId"] = listingId
+            if (!senderId.isNullOrBlank()) data["senderId"] = senderId
+            db.collection("notifications").add(data).await()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     suspend fun getNotificationsForUser(userId: String, limit: Long = 20): List<Notification> {
         return try {
@@ -339,6 +503,81 @@ class RentalRepository {
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
+        }
+    }
+}
+
+class TenancyRepository {
+    private val db = FirebaseFirestore.getInstance()
+
+    suspend fun getTenanciesForTenant(tenantId: String): List<io.github.howshous.data.models.Tenancy> {
+        return try {
+            val snap = db.collection("tenancies")
+                .whereEqualTo("tenantId", tenantId)
+                .get()
+                .await()
+            snap.documents.mapNotNull { doc ->
+                doc.toObject(io.github.howshous.data.models.Tenancy::class.java)?.copy(id = doc.id)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    suspend fun getTenanciesForListing(listingId: String): List<io.github.howshous.data.models.Tenancy> {
+        return try {
+            val snap = db.collection("tenancies")
+                .whereEqualTo("listingId", listingId)
+                .get()
+                .await()
+            snap.documents.mapNotNull { doc ->
+                doc.toObject(io.github.howshous.data.models.Tenancy::class.java)?.copy(id = doc.id)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    fun listenTenanciesForListing(
+        listingId: String,
+        onUpdate: (List<io.github.howshous.data.models.Tenancy>) -> Unit
+    ): ListenerRegistration? {
+        if (listingId.isBlank()) return null
+        return db.collection("tenancies")
+            .whereEqualTo("listingId", listingId)
+            .addSnapshotListener { snap, error ->
+                if (error != null || snap == null) return@addSnapshotListener
+                val tenancies = snap.documents.mapNotNull { doc ->
+                    doc.toObject(io.github.howshous.data.models.Tenancy::class.java)?.copy(id = doc.id)
+                }
+                onUpdate(tenancies)
+            }
+    }
+
+    suspend fun getTenancy(listingId: String, tenantId: String): io.github.howshous.data.models.Tenancy? {
+        return try {
+            val tenancyId = "${listingId}_$tenantId"
+            val doc = db.collection("tenancies").document(tenancyId).get().await()
+            doc.toObject(io.github.howshous.data.models.Tenancy::class.java)?.copy(id = doc.id)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    suspend fun updateTenancyStatus(listingId: String, tenantId: String, status: String) {
+        try {
+            val tenancyId = "${listingId}_$tenantId"
+            db.collection("tenancies").document(tenancyId).update(
+                mapOf(
+                    "status" to status,
+                    "updatedAt" to Timestamp.now()
+                )
+            ).await()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }
