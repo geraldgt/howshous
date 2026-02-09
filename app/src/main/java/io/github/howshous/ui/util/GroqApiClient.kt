@@ -231,6 +231,58 @@ object GroqApiClient {
         }
     }
 
+    /**
+     * Landlord analytics fallback when the project is not on Blaze (Cloud Functions not deployed).
+     * Prefer the gateway when available; use this only when the callable fails.
+     */
+    suspend fun fetchLandlordAnalyticsReply(query: String, analyticsContextJson: String): Result<String> = withContext(Dispatchers.IO) {
+        val key = GroqKeyProvider.getKey()
+            ?: return@withContext Result.failure(IllegalStateException("GROQ_API_KEY not set in local.properties"))
+        val sanitized = if (containsPromptInjection(query)) {
+            android.util.Log.w("GroqApiClient", "Landlord: prompt injection detected, sanitizing")
+            "I'd like to understand my listing performance. Can you explain my views, saves, and conversion rates?"
+        } else query.trim()
+        val userContent = if (analyticsContextJson.isBlank() || analyticsContextJson == "{}") sanitized
+        else "User question: $sanitized\n\nOptional context (landlord's metrics summary):\n$analyticsContextJson"
+        val systemPrompt = """
+            You are HowsHous Analytics AI. You help landlords understand their listing performance. You will receive the landlord's question and their data as a JSON payload appended in the same message. Use only that JSON; do not describe the data in text—it is already provided.
+            What the data represents: summary = 30d aggregates (totalViews30d, totalSaves30d, totalMessages30d, rate percentages). listings = per listing (listingId, title, price, views, saves, messages, rate percentages).
+            Rules: Do NOT guess; use only numbers in the appended JSON. Do NOT give guarantees. If off-topic, reply once: "I'm here to help with your listing analytics only."
+            Answer briefly. Use the appended JSON only.
+        """.trimIndent()
+        return@withContext try {
+            val payload = JSONObject().apply {
+                put("model", "llama-3.1-8b-instant")
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply { put("role", "system"); put("content", systemPrompt) })
+                    put(JSONObject().apply { put("role", "user"); put("content", userContent) })
+                })
+                put("temperature", 0.5)
+                put("max_tokens", 800)
+            }.toString()
+            val request = Request.Builder()
+                .url(endpoint)
+                .post(payload.toRequestBody(mediaType))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer $key")
+                .build()
+            httpClient.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    val err = runCatching { JSONObject(body).optJSONObject("error")?.optString("message", "") }.getOrElse { "API error ${response.code}" }
+                    return@withContext Result.failure(IOException(err))
+                }
+                val parsed = parseResponse(body)
+                if (parsed == null) return@withContext Result.failure(IOException("Empty response"))
+                val keywords = listOf("view", "save", "message", "conversion", "listing", "performance", "metric", "rate")
+                val valid = keywords.any { parsed.lowercase().contains(it) }
+                Result.success(if (valid) parsed else "I'm here to help with your listing analytics. Ask about your views, saves, or conversion rates.")
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     private fun parseResponse(body: String): String? {
         return runCatching {
             val root = JSONObject(body)

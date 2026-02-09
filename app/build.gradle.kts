@@ -77,6 +77,7 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
     implementation(libs.firebase.messaging)
+    implementation("com.google.firebase:firebase-functions")
     implementation(libs.coroutines.play.services)
 
     implementation(libs.datastore.preferences)
