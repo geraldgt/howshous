@@ -187,9 +187,7 @@ fun LandlordListings(nav: NavController) {
     LaunchedEffect(listings, metricsRefreshTrigger) {
         if (listings.isNotEmpty()) {
             metricsLoading = true
-            metricsMap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                metricsRepo.getMetricsForListings(listings.map { it.id })
-            }
+            metricsMap = metricsRepo.getMetricsForListings(listings.map { it.id })
             metricsLoading = false
         } else {
             metricsMap = emptyMap()
@@ -308,17 +306,6 @@ fun LandlordListings(nav: NavController) {
                                 color = Color.DarkGray
                             )
                         }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Button(
-                        onClick = { nav.navigate("landlord_analytics_chat") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = VacancyBlue,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text("Chat with AI about your data")
                     }
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(
