@@ -2,8 +2,8 @@ package io.github.howshous.ui.util
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
-import io.github.howshous.data.models.Listing
 import kotlinx.coroutines.tasks.await
+import java.util.Date
 
 object SampleListingsGenerator {
 
@@ -121,6 +121,35 @@ object SampleListingsGenerator {
             amenities = listOf("Free Parking", "WiFi", "Air Conditioning", "Gym Access", "Swimming Pool", "Furnished", "Security", "CCTV", "Kitchen Access", "Laundry")
         )
     )
+
+    private val reviewCounts = listOf(
+        48 to 2,  // 96% overwhelmingly positive
+        18 to 6,  // 75% mostly positive
+        10 to 12, // 45% mixed
+        30 to 3,  // 91% very positive
+        14 to 9,  // 61% mixed
+        8 to 14,  // 36% mostly negative
+        22 to 4,  // 85% positive
+        12 to 3,  // 80% positive
+        6 to 9,   // 40% mixed
+        38 to 1   // 97% overwhelmingly positive
+    )
+
+    private val positiveComments = listOf(
+        "Clean, quiet, and exactly as described.",
+        "Great value for the price. Would recommend.",
+        "Owner was responsive and helpful.",
+        "Comfortable stay and solid amenities.",
+        "Felt safe and convenient for work."
+    )
+
+    private val negativeComments = listOf(
+        "Needs better maintenance in common areas.",
+        "Not as quiet as expected during weekends.",
+        "Photos looked better than the actual room.",
+        "WiFi was unstable at times.",
+        "Security could be improved."
+    )
     
     suspend fun generateSampleListings(landlordId: String): List<String> {
         if (landlordId.isBlank()) return emptyList()
@@ -131,7 +160,7 @@ object SampleListingsGenerator {
         deleteExistingSampleListings(landlordId)
 
         // Then create new sample listings
-        sampleListings.forEach { template ->
+        sampleListings.forEachIndexed { index, template ->
             val docRef = db.collection("listings").document()
             val now = Timestamp.now()
             val listingMap = hashMapOf<String, Any>(
@@ -151,10 +180,22 @@ object SampleListingsGenerator {
                 "createdAt" to now,
                 "updatedAt" to now,
                 "uniqueViewCount" to 0,
-                "isSample" to true
+                "isSample" to true,
+                "reviewSummary" to mapOf(
+                    "total" to 0,
+                    "recommendedCount" to 0,
+                    "notRecommendedCount" to 0,
+                    "updatedAt" to now
+                )
             )
             docRef.set(listingMap).await()
             createdIds.add(docRef.id)
+            val (recommendedCount, notRecommendedCount) = reviewCounts.getOrElse(index) { 0 to 0 }
+            seedSampleReviewsForListing(
+                listingId = docRef.id,
+                recommendedCount = recommendedCount,
+                notRecommendedCount = notRecommendedCount
+            )
         }
         return createdIds
     }
@@ -175,6 +216,51 @@ object SampleListingsGenerator {
             e.printStackTrace()
             // Continue even if deletion fails - we'll just overwrite
         }
+    }
+
+    private suspend fun seedSampleReviewsForListing(
+        listingId: String,
+        recommendedCount: Int,
+        notRecommendedCount: Int
+    ) {
+        if (listingId.isBlank()) return
+        val total = recommendedCount + notRecommendedCount
+        if (total <= 0) return
+        val db = FirebaseFirestore.getInstance()
+        val reviewsRef = db.collection("listings").document(listingId).collection("reviews")
+        val now = System.currentTimeMillis()
+
+        for (i in 0 until recommendedCount) {
+            val comment = positiveComments[i % positiveComments.size]
+            val review = mapOf(
+                "listingId" to listingId,
+                "reviewerId" to "seed_tenant_${(i % 5) + 1}",
+                "recommended" to true,
+                "comment" to comment,
+                "createdAt" to Timestamp(Date(now - (i + 1L) * 86_400_000L))
+            )
+            reviewsRef.add(review).await()
+        }
+
+        for (i in 0 until notRecommendedCount) {
+            val comment = negativeComments[i % negativeComments.size]
+            val review = mapOf(
+                "listingId" to listingId,
+                "reviewerId" to "seed_tenant_${(i % 5) + 1}",
+                "recommended" to false,
+                "comment" to comment,
+                "createdAt" to Timestamp(Date(now - (i + 1L) * 86_400_000L))
+            )
+            reviewsRef.add(review).await()
+        }
+
+        val summary = mapOf(
+            "total" to total,
+            "recommendedCount" to recommendedCount,
+            "notRecommendedCount" to notRecommendedCount,
+            "updatedAt" to Timestamp.now()
+        )
+        db.collection("listings").document(listingId).update("reviewSummary", summary).await()
     }
 }
 

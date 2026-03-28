@@ -56,6 +56,12 @@ class DataInitializer {
                     "status" to "active",
                     "photos" to listOf("https://via.placeholder.com/300x200?text=Apartment+1"),
                     "amenities" to listOf("WiFi", "Parking", "Kitchen"),
+                    "reviewSummary" to mapOf(
+                        "total" to 12,
+                        "recommendedCount" to 11,
+                        "notRecommendedCount" to 1,
+                        "updatedAt" to com.google.firebase.Timestamp.now()
+                    ),
                     "createdAt" to com.google.firebase.Timestamp.now()
                 ),
                 mapOf(
@@ -68,6 +74,12 @@ class DataInitializer {
                     "status" to "active",
                     "photos" to listOf("https://via.placeholder.com/300x200?text=House+1"),
                     "amenities" to listOf("Garden", "Garage", "Backyard"),
+                    "reviewSummary" to mapOf(
+                        "total" to 18,
+                        "recommendedCount" to 14,
+                        "notRecommendedCount" to 4,
+                        "updatedAt" to com.google.firebase.Timestamp.now()
+                    ),
                     "createdAt" to com.google.firebase.Timestamp.now()
                 )
             )

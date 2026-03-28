@@ -36,6 +36,7 @@ data class Listing(
     val photos: List<String> = emptyList(),
     val amenities: List<String> = emptyList(),
     val landDeedUrl: String = "",
+    val reviewSummary: ListingReviewSummary? = null,
     val createdAt: Timestamp? = null,
     val updatedAt: Timestamp? = null,
     val uniqueViewCount: Int = 0,

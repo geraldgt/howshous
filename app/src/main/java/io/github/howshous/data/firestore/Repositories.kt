@@ -199,7 +199,8 @@ class ListingRepository {
                 reviewStatus = "under_review",
                 reviewedAt = null,
                 reviewedBy = "",
-                reviewNotes = ""
+                reviewNotes = "",
+                reviewSummary = listing.reviewSummary ?: io.github.howshous.data.models.ListingReviewSummary()
             )
             if (listing.id.isNotBlank()) {
                 db.collection("listings").document(listing.id).set(forWrite).await()

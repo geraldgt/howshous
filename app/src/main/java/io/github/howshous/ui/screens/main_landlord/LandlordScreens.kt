@@ -38,6 +38,7 @@ import io.github.howshous.ui.viewmodels.ChatViewModel
 import io.github.howshous.ui.viewmodels.NotificationViewModel
 import io.github.howshous.ui.viewmodels.AccountViewModel
 import io.github.howshous.ui.components.ListingCard
+import io.github.howshous.ui.components.ReviewSummaryRow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -402,6 +403,8 @@ fun LandlordListings(nav: NavController) {
                                                         )
                                                     }
                                                 }
+                                                Spacer(Modifier.height(6.dp))
+                                                ReviewSummaryRow(summary = listing.reviewSummary, compact = true)
                                                 if (m != null) {
                                                     Spacer(Modifier.height(8.dp))
                                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

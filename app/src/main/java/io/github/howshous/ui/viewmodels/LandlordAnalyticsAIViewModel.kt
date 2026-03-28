@@ -6,6 +6,7 @@ import io.github.howshous.data.firestore.AIChatRepository
 import io.github.howshous.data.firestore.ListingMetricsRepository
 import io.github.howshous.data.firestore.ListingRepository
 import io.github.howshous.ui.util.GroqApiClient
+import io.github.howshous.utils.ReviewSummaryUtils
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,12 +56,20 @@ class LandlordAnalyticsAIViewModel : ViewModel() {
         val totalViews = metrics.values.sumOf { it.views30d }
         val totalSaves = metrics.values.sumOf { it.saves30d }
         val totalMessages = metrics.values.sumOf { it.messages30d }
+        val totalReviews = listings.sumOf { it.reviewSummary?.total ?: 0 }
+        val totalRecommended = listings.sumOf { it.reviewSummary?.recommendedCount ?: 0 }
+        val overallRecommendPct = if (totalReviews > 0) {
+            "%.1f".format(totalRecommended * 100f / totalReviews)
+        } else {
+            "0.0"
+        }
         val arr = JSONArray()
         listings
             .sortedByDescending { metrics[it.id]?.views30d ?: 0 }
             .take(25)
             .forEach { listing ->
             val m = metrics[listing.id] ?: return@forEach
+            val reviewDisplay = ReviewSummaryUtils.buildDisplay(listing.reviewSummary)
             arr.put(JSONObject().apply {
                 put("title", listing.title.take(80))
                 put("price", listing.price)
@@ -69,6 +78,9 @@ class LandlordAnalyticsAIViewModel : ViewModel() {
                 put("messages30d", m.messages30d)
                 put("saveRatePct", if (m.views30d > 0) "%.1f".format(m.saves30d * 100f / m.views30d) else "0.0")
                 put("messageRatePct", if (m.views30d > 0) "%.1f".format(m.messages30d * 100f / m.views30d) else "0.0")
+                put("reviewPercent", reviewDisplay.recommendedPercent)
+                put("reviewLabel", reviewDisplay.label)
+                put("reviewTotal", reviewDisplay.total)
             })
         }
         return JSONObject().apply {
@@ -76,6 +88,8 @@ class LandlordAnalyticsAIViewModel : ViewModel() {
                 put("totalViews30d", totalViews)
                 put("totalSaves30d", totalSaves)
                 put("totalMessages30d", totalMessages)
+                put("totalReviews", totalReviews)
+                put("overallRecommendPct", overallRecommendPct)
             })
             put("windowDays", 30)
             put("listings", arr)
@@ -167,4 +181,3 @@ class LandlordAnalyticsAIViewModel : ViewModel() {
         }
     }
 }
-

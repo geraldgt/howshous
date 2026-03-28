@@ -56,3 +56,9 @@ val MutedGray = Color(0xFFD9D9D9)
 val lighterGray = Color(0xFFBCBCBC)
 val slightlyGray = Color(0xFF7D7D7D)
 val OnSurfaceVariant = Color(0xFF49454F)
+
+// Review scale
+val ReviewRed = Color(0xFFC62828)
+val ReviewOrange = Color(0xFFF57C00)
+val ReviewGreen = Color(0xFF2E7D32)
+val ReviewBlue = Color(0xFF1565C0)

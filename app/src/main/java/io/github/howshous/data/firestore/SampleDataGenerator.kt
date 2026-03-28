@@ -43,6 +43,12 @@ object SampleDataGenerator {
             deposit = 50000,
             status = "active",
             reviewStatus = "under_review",
+            reviewSummary = ListingReviewSummary(
+                total = 50,
+                recommendedCount = 47,
+                notRecommendedCount = 3,
+                updatedAt = Timestamp.now()
+            ),
             photos = listOf(),
             amenities = listOf("WiFi", "AC", "Parking", "Water Supply", "Gym"),
             createdAt = Timestamp.now(),
@@ -58,6 +64,12 @@ object SampleDataGenerator {
             deposit = 36000,
             status = "active",
             reviewStatus = "under_review",
+            reviewSummary = ListingReviewSummary(
+                total = 24,
+                recommendedCount = 18,
+                notRecommendedCount = 6,
+                updatedAt = Timestamp.now()
+            ),
             photos = listOf(),
             amenities = listOf("WiFi", "Furnished", "Water Supply"),
             createdAt = Timestamp.now(),
@@ -73,6 +85,12 @@ object SampleDataGenerator {
             deposit = 90000,
             status = "full",
             reviewStatus = "under_review",
+            reviewSummary = ListingReviewSummary(
+                total = 22,
+                recommendedCount = 10,
+                notRecommendedCount = 12,
+                updatedAt = Timestamp.now()
+            ),
             photos = listOf(),
             amenities = listOf("WiFi", "AC", "Parking", "Garden", "Pool", "Gym"),
             createdAt = Timestamp.now(),

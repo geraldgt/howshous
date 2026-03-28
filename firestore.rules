@@ -88,6 +88,24 @@ service cloud.firestore {
           && request.resource.data.viewerId == viewerId;
         allow update, delete: if false;
       }
+
+      match /reviews/{reviewId} {
+        allow read: if isListingPublic(get(/databases/$(database)/documents/listings/$(listingId)).data)
+          || isAdmin()
+          || isLandlordForListing(listingId)
+          || (isSignedIn() && request.auth.uid == resource.data.reviewerId);
+        allow create: if isSignedIn()
+          && request.resource.data.listingId == listingId
+          && (
+            request.auth.uid == request.resource.data.reviewerId
+            || (
+              isLandlordForListing(listingId)
+              && get(/databases/$(database)/documents/listings/$(listingId)).data.isSample == true
+              && request.resource.data.reviewerId.matches("^seed_tenant_[1-9][0-9]*$")
+            )
+          );
+        allow update, delete: if false;
+      }
     }
 
     match /users/{userId} {

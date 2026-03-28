@@ -109,6 +109,9 @@ fun ListingCard(
                     color = PricePointGreen
                 )
 
+                Spacer(Modifier.height(4.dp))
+                ReviewSummaryRow(summary = listing.reviewSummary, compact = true)
+
                 if (showViews) {
                     Spacer(Modifier.height(4.dp))
                     Row(

@@ -42,6 +42,7 @@ import io.github.howshous.ui.data.ensureSessionId
 import io.github.howshous.ui.theme.PricePointGreen
 import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.viewmodels.ListingViewModel
+import io.github.howshous.ui.components.ReviewSummaryRow
 import kotlinx.coroutines.launch
 
 @Composable
@@ -234,6 +235,8 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                     Text("₱${listing!!.price}/month", style = MaterialTheme.typography.titleMedium, color = PricePointGreen)
                     Text("Deposit: ₱${listing!!.deposit}", style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(8.dp))
+                    ReviewSummaryRow(summary = listing!!.reviewSummary)
+                    Spacer(Modifier.height(12.dp))
                     if (role == "tenant" || role == "administrator") {
                         val landlordName = listOfNotNull(
                             landlordProfile?.firstName?.takeIf { it.isNotBlank() },
