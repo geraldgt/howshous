@@ -53,7 +53,7 @@ class DataInitializer {
                     "location" to "Downtown",
                     "price" to 25000,
                     "deposit" to 50000,
-                    "status" to "active",
+                    "status" to "under_review",
                     "photos" to listOf("https://via.placeholder.com/300x200?text=Apartment+1"),
                     "amenities" to listOf("WiFi", "Parking", "Kitchen"),
                     "reviewSummary" to mapOf(
@@ -71,7 +71,7 @@ class DataInitializer {
                     "location" to "Suburbs",
                     "price" to 45000,
                     "deposit" to 90000,
-                    "status" to "active",
+                    "status" to "under_review",
                     "photos" to listOf("https://via.placeholder.com/300x200?text=House+1"),
                     "amenities" to listOf("Garden", "Garage", "Backyard"),
                     "reviewSummary" to mapOf(

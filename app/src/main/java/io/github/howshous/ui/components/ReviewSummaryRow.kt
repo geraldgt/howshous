@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import io.github.howshous.data.models.ListingReviewSummary
 import io.github.howshous.ui.theme.ReviewBlue
+import io.github.howshous.ui.theme.ReviewDarkRed
 import io.github.howshous.ui.theme.ReviewGreen
 import io.github.howshous.ui.theme.ReviewOrange
 import io.github.howshous.ui.theme.ReviewRed
@@ -21,7 +22,7 @@ import io.github.howshous.utils.ReviewSummaryUtils
 import java.text.NumberFormat
 
 private val reviewStops = listOf(
-    0f to Color(0xFF8B1B1B), // darkest red
+    0f to ReviewDarkRed,
     0.25f to ReviewRed,
     0.5f to ReviewOrange,
     0.75f to ReviewGreen,

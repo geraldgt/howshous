@@ -5,10 +5,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
@@ -19,18 +23,21 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import io.github.howshous.R
 import io.github.howshous.data.firestore.ListingRepository
+import io.github.howshous.data.firestore.ListingReviewRepository
 import io.github.howshous.data.firestore.NotificationRepository
 import io.github.howshous.data.firestore.UserRepository
 import io.github.howshous.data.models.UserProfile
@@ -40,11 +47,16 @@ import io.github.howshous.ui.data.readRoleFlow
 import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.data.ensureSessionId
 import io.github.howshous.ui.theme.PricePointGreen
+import io.github.howshous.ui.theme.ReviewGreen
+import io.github.howshous.ui.theme.ReviewRed
 import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.viewmodels.ListingViewModel
 import io.github.howshous.ui.components.ReviewSummaryRow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
 
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ListingDetailScreen(nav: NavController, listingId: String = "") {
     val context = LocalContext.current
@@ -52,6 +64,7 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
     val role by readRoleFlow(context).collectAsState(initial = "")
     val viewModel: ListingViewModel = viewModel()
     val listingRepository = remember { ListingRepository() }
+    val reviewRepository = remember { ListingReviewRepository() }
     val notificationRepository = remember { NotificationRepository() }
     val scope = rememberCoroutineScope()
     val listing by viewModel.listing.collectAsState()
@@ -66,6 +79,9 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
     var rejectionReasons by remember { mutableStateOf(setOf<String>()) }
     var showRejectDialog by remember { mutableStateOf(false) }
     var rejectDialogError by remember { mutableStateOf("") }
+    var showReviewsSheet by remember { mutableStateOf(false) }
+    var isReviewsLoading by remember { mutableStateOf(false) }
+    var reviews by remember { mutableStateOf(emptyList<io.github.howshous.data.models.ListingReview>()) }
     val adminRejectReasonOptions = remember {
         listOf(
             "Contract terms are missing or invalid",
@@ -111,6 +127,14 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                 price = currentListing.price
             )
         }
+    }
+
+    LaunchedEffect(showReviewsSheet, listingId) {
+        if (!showReviewsSheet) return@LaunchedEffect
+        if (listingId.isBlank()) return@LaunchedEffect
+        isReviewsLoading = true
+        reviews = reviewRepository.getReviewsForListing(listingId)
+        isReviewsLoading = false
     }
 
     Column(
@@ -235,30 +259,11 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                     Text("₱${listing!!.price}/month", style = MaterialTheme.typography.titleMedium, color = PricePointGreen)
                     Text("Deposit: ₱${listing!!.deposit}", style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(8.dp))
-                    ReviewSummaryRow(summary = listing!!.reviewSummary)
+                    ReviewSummaryRow(
+                        summary = listing!!.reviewSummary,
+                        modifier = Modifier.clickable { showReviewsSheet = true }
+                    )
                     Spacer(Modifier.height(12.dp))
-                    if (role == "tenant" || role == "administrator") {
-                        val landlordName = listOfNotNull(
-                            landlordProfile?.firstName?.takeIf { it.isNotBlank() },
-                            landlordProfile?.lastName?.takeIf { it.isNotBlank() }
-                        ).joinToString(" ").ifBlank { "Landlord" }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Landlord:", style = MaterialTheme.typography.bodySmall)
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                landlordName,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = PricePointGreen,
-                                modifier = Modifier.clickable {
-                                    val landlordId = listing!!.landlordId
-                                    if (landlordId.isNotBlank()) {
-                                        nav.navigate("landlord_profile/$landlordId")
-                                    }
-                                }
-                            )
-                        }
-                        Spacer(Modifier.height(8.dp))
-                    }
                     if (role == "landlord") {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
@@ -276,11 +281,96 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                     }
                 }
 
+                // Landlord
+                item {
+                    if (role == "tenant" || role == "administrator") {
+                        val landlordName = listOfNotNull(
+                            landlordProfile?.firstName?.takeIf { it.isNotBlank() },
+                            landlordProfile?.lastName?.takeIf { it.isNotBlank() }
+                        ).joinToString(" ").ifBlank { "Landlord" }
+                        val landlordId = listing!!.landlordId
+                        val profileUrl = landlordProfile?.profileImageUrl?.trim().orEmpty()
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    if (landlordId.isNotBlank()) {
+                                        Modifier.clickable { nav.navigate("landlord_profile/$landlordId") }
+                                    } else {
+                                        Modifier
+                                    }
+                                ),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (profileUrl.isNotBlank()) {
+                                    AsyncImage(
+                                        model = profileUrl,
+                                        contentDescription = "Landlord profile photo",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .clip(CircleShape)
+                                    )
+                                } else {
+                                    Surface(
+                                        modifier = Modifier.size(56.dp),
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceVariant
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                painter = painterResource(R.drawable.i_user),
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(26.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        landlordName,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        "View landlord profile",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
+
                 // Description
                 item {
                     Text("Description", style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(8.dp))
-                    Text(listing!!.description, style = MaterialTheme.typography.bodySmall)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surface
+                    ) {
+                        Text(
+                            listing!!.description,
+                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
+                            modifier = Modifier.padding(14.dp)
+                        )
+                    }
                     Spacer(Modifier.height(16.dp))
                 }
 
@@ -289,8 +379,23 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                     if (listing!!.amenities.isNotEmpty()) {
                         Text("Amenities", style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(8.dp))
-                        listing!!.amenities.forEach { amenity ->
-                            Text("• $amenity", style = MaterialTheme.typography.bodySmall)
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listing!!.amenities.forEach { amenity ->
+                                Surface(
+                                    shape = MaterialTheme.shapes.large,
+                                    color = MaterialTheme.colorScheme.surfaceVariant
+                                ) {
+                                    Text(
+                                        amenity,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
                         }
                         Spacer(Modifier.height(16.dp))
                     }
@@ -349,33 +454,35 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                 // Contact Button
                 item {
                     if (role == "tenant") {
+                        val isInteractable = listing!!.status == "active"
                         Button(
                             onClick = {
                                 nav.navigate("initiate_chat/${listingId}/${listing!!.landlordId}")
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(50.dp)
+                                .height(50.dp),
+                            enabled = isInteractable
                         ) {
-                            Text("Contact Landlord")
+                            Text(if (isInteractable) "Contact Landlord" else "Listing Unavailable")
                         }
                     } else if (role == "administrator") {
-                        val reviewStatus = listing!!.reviewStatus.ifBlank { "approved" }
-                        when (reviewStatus) {
-                            "approved" -> {
+                        val status = listing!!.status.ifBlank { "under_review" }
+                        when (status) {
+                            "active", "inactive" -> {
                                 Button(
                                     onClick = {
                                         scope.launch {
                                             listingRepository.takeDownListing(
                                                 listingId = listingId,
                                                 adminUid = uid,
-                                                notes = "Taken down by admin"
+                                                notes = "Delisted by admin"
                                             )
                                             notificationRepository.createNotification(
                                                 userId = listing!!.landlordId,
-                                                type = "listing_taken_down",
-                                                title = "Listing Taken Down",
-                                                message = "Your listing \"${listing!!.title}\" was taken down by admin.",
+                                                type = "listing_delisted",
+                                                title = "Listing Delisted",
+                                                message = "Your listing \"${listing!!.title}\" was delisted by admin.",
                                                 actionUrl = "landlord_listing/${listingId}",
                                                 listingId = listingId,
                                                 senderId = uid
@@ -387,7 +494,7 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB00020))
                                 ) {
-                                    Text("Take Down Listing", color = Color.White)
+                                    Text("Delist Listing", color = Color.White)
                                 }
                             }
                             "under_review", "rejected" -> {
@@ -426,19 +533,69 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                                 }
                             }
                             else -> {
-                                // No moderation action for taken_down/unknown states from this screen.
+                                // No moderation action for delisted/unknown states from this screen.
                             }
                         }
                     }
                 }
             }
-        } else {
+    } else {
                     Text(
                         "Listing not found",
                         modifier = Modifier
                             .align(Alignment.CenterHorizontally)
                             .padding(32.dp)
                     )
+        }
+    }
+
+    if (showReviewsSheet) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showReviewsSheet = false },
+            sheetState = sheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text("Reviews", style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(6.dp))
+                ReviewSummaryRow(summary = listing?.reviewSummary)
+                Spacer(Modifier.height(12.dp))
+
+                when {
+                    isReviewsLoading -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(16.dp)
+                        )
+                    }
+                    reviews.isEmpty() -> {
+                        Text(
+                            "No reviews yet.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 420.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(reviews, key = { it.id }) { review ->
+                                ReviewCard(review = review)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
         }
     }
 
@@ -615,6 +772,58 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                         tint = Color.White
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReviewCard(review: io.github.howshous.data.models.ListingReview) {
+    val formatter = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
+    val dateLabel = review.createdAt?.toDate()?.let { formatter.format(it) } ?: "Recently"
+    val badgeColor = if (review.recommended) ReviewGreen else ReviewRed
+    val badgeText = if (review.recommended) "Recommended" else "Not recommended"
+    val comment = review.comment.trim()
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = badgeColor.copy(alpha = 0.12f)
+                ) {
+                    Text(
+                        badgeText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = badgeColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+                Text(
+                    dateLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            if (comment.isNotBlank()) {
+                Text(
+                    comment,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else {
+                Text(
+                    "No comment provided.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

@@ -24,10 +24,20 @@ object SampleAccountSeeder {
     private const val TENANT_EMAIL = "tt@hh.com"
     private const val TENANT_PASSWORD = "timmytimmy"
 
+    private const val TENANT2_FIRST = "Terry"
+    private const val TENANT2_LAST = "Benevolence"
+    private const val TENANT2_EMAIL = "tb@hh.com"
+    private const val TENANT2_PASSWORD = "terryterry"
+
     private const val LANDLORD_FIRST = "Lemm"
     private const val LANDLORD_LAST = "Landlord"
     private const val LANDLORD_EMAIL = "ll@hh.com"
     private const val LANDLORD_PASSWORD = "lemmlemm"
+
+    private const val LANDLORD2_FIRST = "Larry"
+    private const val LANDLORD2_LAST = "Bantrot"
+    private const val LANDLORD2_EMAIL = "lb@hh.com"
+    private const val LANDLORD2_PASSWORD = "larrylarry"
 
     private const val ADMIN_FIRST = "Annie"
     private const val ADMIN_LAST = "Admin"
@@ -42,20 +52,40 @@ object SampleAccountSeeder {
                 auth = auth,
                 email = TENANT_EMAIL,
                 password = TENANT_PASSWORD
-            ) { createTenantAccount(context) }
+            ) { createTenantAccount(context, TENANT_FIRST, TENANT_LAST, TENANT_EMAIL, TENANT_PASSWORD) }
+            auth.signOut()
+
+            val tenant2Uid = ensureAccount(
+                auth = auth,
+                email = TENANT2_EMAIL,
+                password = TENANT2_PASSWORD
+            ) { createTenantAccount(context, TENANT2_FIRST, TENANT2_LAST, TENANT2_EMAIL, TENANT2_PASSWORD) }
             auth.signOut()
 
             val landlordUid = ensureAccount(
                 auth = auth,
                 email = LANDLORD_EMAIL,
                 password = LANDLORD_PASSWORD
-            ) { createLandlordAccount(context) }
+            ) { createLandlordAccount(context, LANDLORD_FIRST, LANDLORD_LAST, LANDLORD_EMAIL, LANDLORD_PASSWORD) }
+            auth.signOut()
+
+            val landlord2Uid = ensureAccount(
+                auth = auth,
+                email = LANDLORD2_EMAIL,
+                password = LANDLORD2_PASSWORD
+            ) { createLandlordAccount(context, LANDLORD2_FIRST, LANDLORD2_LAST, LANDLORD2_EMAIL, LANDLORD2_PASSWORD) }
             auth.signOut()
 
             // Listing writes are expected to be authored by the landlord account.
             auth.signInWithEmailAndPassword(LANDLORD_EMAIL, LANDLORD_PASSWORD).await()
+            val lemmListingIds = SampleListingsGenerator.generateSampleListings(landlordUid)
+            auth.signOut()
 
-            val createdIds = SampleListingsGenerator.generateSampleListings(landlordUid)
+            auth.signInWithEmailAndPassword(LANDLORD2_EMAIL, LANDLORD2_PASSWORD).await()
+            val larryListingIds = SampleListingsGenerator.generateSampleListings(
+                landlord2Uid,
+                titlePrefix = "Larry's"
+            )
             auth.signOut()
 
             val adminUid = ensureAccount(
@@ -64,12 +94,19 @@ object SampleAccountSeeder {
                 password = ADMIN_PASSWORD
             ) { createAdminAccount(context) }
             val listingRepo = ListingRepository()
-            val listings = listingRepo.getListingsForLandlord(landlordUid)
-            if (listings.isNotEmpty()) {
-                val analyticsRepo = AnalyticsRepository()
+            val analyticsRepo = AnalyticsRepository()
+            val lemmListings = listingRepo.getListingsForLandlord(landlordUid)
+            if (lemmListings.isNotEmpty()) {
                 analyticsRepo.seedTestEventsForLandlord(
                     landlordId = landlordUid,
-                    listings = listings.map { it.id to it.price }
+                    listings = lemmListings.map { it.id to it.price }
+                )
+            }
+            val larryListings = listingRepo.getListingsForLandlord(landlord2Uid)
+            if (larryListings.isNotEmpty()) {
+                analyticsRepo.seedTestEventsForLandlord(
+                    landlordId = landlord2Uid,
+                    listings = larryListings.map { it.id to it.price }
                 )
             }
 
@@ -77,7 +114,7 @@ object SampleAccountSeeder {
 
             SeedResult(
                 true,
-                "Sample accounts ready (tenant=$tenantUid, landlord=$landlordUid, admin=$adminUid). Recreated listings: ${createdIds.size}."
+                "Sample accounts ready (tenant1=$tenantUid, tenant2=$tenant2Uid, landlord1=$landlordUid, landlord2=$landlord2Uid, admin=$adminUid). Recreated listings: lemm=${lemmListingIds.size}, larry=${larryListingIds.size}."
             )
         } catch (e: Exception) {
             auth.signOut()
@@ -130,13 +167,19 @@ object SampleAccountSeeder {
         return snap.documents.firstOrNull()?.id
     }
 
-    private suspend fun createTenantAccount(context: Context): String {
+    private suspend fun createTenantAccount(
+        context: Context,
+        firstName: String,
+        lastName: String,
+        email: String,
+        password: String
+    ): String {
         val auth = FirebaseAuth.getInstance()
         val db = FirebaseFirestore.getInstance()
 
-        val res = auth.createUserWithEmailAndPassword(TENANT_EMAIL, TENANT_PASSWORD).await()
+        val res = auth.createUserWithEmailAndPassword(email, password).await()
         val uid = res.user!!.uid
-        val displayName = "$TENANT_FIRST $TENANT_LAST"
+        val displayName = "$firstName $lastName"
         res.user?.updateProfile(userProfileChangeRequest { this.displayName = displayName })?.await()
 
         val selfieUri = resUri(context, R.drawable.test_pfp)
@@ -148,11 +191,15 @@ object SampleAccountSeeder {
 
         val userDoc = hashMapOf(
             "uid" to uid,
-            "firstName" to TENANT_FIRST,
-            "lastName" to TENANT_LAST,
-            "email" to TENANT_EMAIL,
+            "firstName" to firstName,
+            "lastName" to lastName,
+            "email" to email,
             "role" to "tenant",
             "verified" to false,
+            "isBanned" to false,
+            "bannedAt" to null,
+            "bannedBy" to "",
+            "banReason" to "",
             "profileImageUrl" to profileUrl,
             "businessPermitUrl" to ""
         )
@@ -172,13 +219,19 @@ object SampleAccountSeeder {
         return uid
     }
 
-    private suspend fun createLandlordAccount(context: Context): String {
+    private suspend fun createLandlordAccount(
+        context: Context,
+        firstName: String,
+        lastName: String,
+        email: String,
+        password: String
+    ): String {
         val auth = FirebaseAuth.getInstance()
         val db = FirebaseFirestore.getInstance()
 
-        val res = auth.createUserWithEmailAndPassword(LANDLORD_EMAIL, LANDLORD_PASSWORD).await()
+        val res = auth.createUserWithEmailAndPassword(email, password).await()
         val uid = res.user!!.uid
-        val displayName = "$LANDLORD_FIRST $LANDLORD_LAST"
+        val displayName = "$firstName $lastName"
         res.user?.updateProfile(userProfileChangeRequest { this.displayName = displayName })?.await()
 
         val selfieUri = resUri(context, R.drawable.test_pfp)
@@ -192,11 +245,15 @@ object SampleAccountSeeder {
 
         val userDoc = hashMapOf(
             "uid" to uid,
-            "firstName" to LANDLORD_FIRST,
-            "lastName" to LANDLORD_LAST,
-            "email" to LANDLORD_EMAIL,
+            "firstName" to firstName,
+            "lastName" to lastName,
+            "email" to email,
             "role" to "landlord",
             "verified" to false,
+            "isBanned" to false,
+            "bannedAt" to null,
+            "bannedBy" to "",
+            "banReason" to "",
             "profileImageUrl" to profileUrl,
             "businessPermitUrl" to propertyVerificationUrl
         )

@@ -134,11 +134,12 @@ fun ListingCard(
             }
 
             if (showStatus) {
-                val displayStatus = if (listing.reviewStatus != "approved") listing.reviewStatus else listing.status
+                val displayStatus = listing.status
                 val statusColor = when (displayStatus) {
-                    "active", "approved" -> PricePointGreen
+                    "active" -> PricePointGreen
                     "under_review" -> Color(0xFFE27D23)
-                    "rejected", "taken_down", "removed" -> Color(0xFFB00020)
+                    "inactive" -> slightlyGray
+                    "rejected", "delisted" -> Color(0xFFB00020)
                     else -> slightlyGray
                 }
                 Text(

@@ -26,8 +26,5 @@ class RentalRepository {
             "status" to "active"
         )
         db.collection("rentals").document(rentalId).set(rental).await()
-
-        // Optionally set listing status to full
-        db.collection("listings").document(listingId).update("status", "full").await()
     }
 }

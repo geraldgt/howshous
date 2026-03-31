@@ -102,20 +102,6 @@ fun LandlordListingDetail(nav: NavController, listingId: String = "") {
         return status == "signed" || status == "confirmed" || status == "needs_resign" || status == "active"
     }
 
-    LaunchedEffect(listing?.id, listing?.status, tenancies) {
-        val currentListing = listing ?: return@LaunchedEffect
-        if (currentListing.status == "maintenance") return@LaunchedEffect
-        val capacityValue = currentListing.capacity.coerceAtLeast(1)
-        val activeCount = tenancies.count { isActiveTenancy(it.status) }
-        val desiredStatus = if (activeCount >= capacityValue) "full" else "active"
-        if (currentListing.status != desiredStatus) {
-            listingRepository.updateListing(
-                currentListing.id,
-                mapOf("status" to desiredStatus)
-            )
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -292,6 +278,17 @@ fun LandlordListingDetail(nav: NavController, listingId: String = "") {
                                 } else {
                                     updates["contractTemplate"] = FieldValue.delete()
                                 }
+                                val currentStatus = listing!!.status
+                                val previousStatus = if (currentStatus == "active" || currentStatus == "inactive") {
+                                    currentStatus
+                                } else {
+                                    listing!!.previousStatus
+                                }
+                                updates["status"] = "under_review"
+                                updates["previousStatus"] = previousStatus
+                                updates["reviewedBy"] = ""
+                                updates["reviewNotes"] = ""
+                                updates["reviewedAt"] = FieldValue.delete()
                                 scope.launch {
                                     try {
                                         listingRepository.updateListing(

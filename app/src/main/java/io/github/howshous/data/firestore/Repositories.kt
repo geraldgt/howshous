@@ -5,6 +5,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import io.github.howshous.data.models.UserProfile
+import io.github.howshous.data.models.BanAppeal
 import io.github.howshous.data.models.Listing
 import io.github.howshous.data.models.Chat
 import io.github.howshous.data.models.Message
@@ -81,6 +82,8 @@ class UserRepository {
         reason: String = ""
     ) {
         try {
+            val userDoc = db.collection("users").document(uid).get().await()
+            val role = userDoc.getString("role") ?: ""
             val updates = if (banned) {
                 mapOf(
                     "isBanned" to true,
@@ -97,26 +100,227 @@ class UserRepository {
                 )
             }
             db.collection("users").document(uid).update(updates).await()
+            if (role == "landlord") {
+                if (banned) {
+                    delistLandlordListings(uid, adminUid, reason)
+                } else {
+                    resetLandlordListingsForReview(uid)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private suspend fun delistLandlordListings(
+        landlordId: String,
+        adminUid: String,
+        reason: String
+    ) {
+        if (landlordId.isBlank()) return
+        try {
+            val snap = db.collection("listings")
+                .whereEqualTo("landlordId", landlordId)
+                .get()
+                .await()
+            val note = reason.trim().ifBlank { "Delisted due to landlord ban." }
+            val now = Timestamp.now()
+            for (doc in snap.documents) {
+                val currentStatus = doc.getString("status") ?: ""
+                val existingPrevious = doc.getString("previousStatus") ?: ""
+                val previousStatus = if (currentStatus == "active" || currentStatus == "inactive") {
+                    currentStatus
+                } else {
+                    existingPrevious
+                }
+                doc.reference.update(
+                    mapOf(
+                        "status" to "delisted",
+                        "previousStatus" to previousStatus,
+                        "reviewedAt" to now,
+                        "reviewedBy" to adminUid,
+                        "reviewNotes" to note
+                    )
+                ).await()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private suspend fun resetLandlordListingsForReview(landlordId: String) {
+        if (landlordId.isBlank()) return
+        try {
+            val snap = db.collection("listings")
+                .whereEqualTo("landlordId", landlordId)
+                .get()
+                .await()
+            for (doc in snap.documents) {
+                doc.reference.update(
+                    mapOf(
+                        "status" to "under_review",
+                        "reviewedAt" to null,
+                        "reviewedBy" to "",
+                        "reviewNotes" to ""
+                    )
+                ).await()
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 }
 
+class BanAppealRepository {
+    private val db = FirebaseFirestore.getInstance()
+
+    suspend fun getAppealsForUser(uid: String): List<BanAppeal> {
+        return try {
+            val snap = db.collection("ban_appeals")
+                .whereEqualTo("userId", uid)
+                .get()
+                .await()
+            snap.documents.mapNotNull { doc ->
+                doc.toObject(BanAppeal::class.java)?.copy(id = doc.id)
+            }.sortedByDescending { it.createdAt?.toDate()?.time ?: 0L }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    suspend fun hasPendingAppeal(uid: String): Boolean {
+        return try {
+            val snap = db.collection("ban_appeals")
+                .whereEqualTo("userId", uid)
+                .get()
+                .await()
+            snap.documents.any { it.getString("status") == "pending" }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun createAppeal(uid: String, message: String): Result<String> {
+        if (message.isBlank()) {
+            return Result.failure(IllegalArgumentException("Appeal message cannot be empty."))
+        }
+        return try {
+            if (hasPendingAppeal(uid)) {
+                return Result.failure(IllegalStateException("You already have a pending appeal."))
+            }
+            val data = mapOf(
+                "userId" to uid,
+                "message" to message.trim(),
+                "status" to "pending",
+                "createdAt" to Timestamp.now(),
+                "reviewedAt" to null,
+                "reviewedBy" to "",
+                "reviewNotes" to ""
+            )
+            val docRef = db.collection("ban_appeals").add(data).await()
+            Result.success(docRef.id)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getAllAppeals(limit: Long = 200): List<BanAppeal> {
+        return try {
+            val snap = db.collection("ban_appeals")
+                .limit(limit)
+                .get()
+                .await()
+            snap.documents.mapNotNull { doc ->
+                doc.toObject(BanAppeal::class.java)?.copy(id = doc.id)
+            }.sortedWith(compareBy<BanAppeal> { it.status != "pending" }
+                .thenByDescending { it.createdAt?.toDate()?.time ?: 0L })
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    suspend fun getPendingCount(): Int {
+        return try {
+            val snap = db.collection("ban_appeals")
+                .whereEqualTo("status", "pending")
+                .get()
+                .await()
+            snap.size()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            0
+        }
+    }
+
+    suspend fun reviewAppeal(
+        appealId: String,
+        adminUid: String,
+        approved: Boolean,
+        notes: String = ""
+    ): Boolean {
+        return try {
+            val appealRef = db.collection("ban_appeals").document(appealId)
+            val appealDoc = appealRef.get().await()
+            if (!appealDoc.exists()) {
+                return false
+            }
+            val userId = appealDoc.getString("userId") ?: return false
+            val status = if (approved) "approved" else "rejected"
+
+            val batch = db.batch()
+            batch.update(
+                appealRef,
+                mapOf(
+                    "status" to status,
+                    "reviewedAt" to Timestamp.now(),
+                    "reviewedBy" to adminUid,
+                    "reviewNotes" to notes.trim()
+                )
+            )
+            if (approved) {
+                val userRef = db.collection("users").document(userId)
+                batch.update(
+                    userRef,
+                    mapOf(
+                        "isBanned" to false,
+                        "bannedAt" to null,
+                        "bannedBy" to "",
+                        "banReason" to ""
+                    )
+                )
+            }
+            batch.commit().await()
+            if (approved) {
+                UserRepository().setUserBanStatus(
+                    uid = userId,
+                    banned = false,
+                    adminUid = adminUid,
+                    reason = ""
+                )
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+}
+
 class ListingRepository {
     private val db = FirebaseFirestore.getInstance()
-    private val publicStatuses = listOf("active", "full", "maintenance")
 
     suspend fun getAllListings(): List<Listing> {
         return try {
             val snap = db.collection("listings")
-                .whereEqualTo("reviewStatus", "approved")
-                .whereIn("status", publicStatuses)
+                .whereEqualTo("status", "active")
                 .get()
                 .await()
             snap.documents.mapNotNull { doc ->
                 doc.toObject(Listing::class.java)?.copy(id = doc.id)
-            }.filter { it.status != "removed" }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
@@ -138,7 +342,7 @@ class ListingRepository {
     suspend fun getListingsUnderReview(): List<Listing> {
         return try {
             val snap = db.collection("listings")
-                .whereEqualTo("reviewStatus", "under_review")
+                .whereEqualTo("status", "under_review")
                 .get()
                 .await()
             snap.documents.mapNotNull { doc ->
@@ -154,13 +358,12 @@ class ListingRepository {
         return try {
             val snap = db.collection("listings")
                 .whereEqualTo("location", location)
-                .whereEqualTo("reviewStatus", "approved")
-                .whereIn("status", publicStatuses)
+                .whereEqualTo("status", "active")
                 .get()
                 .await()
             snap.documents.mapNotNull { doc ->
                 doc.toObject(Listing::class.java)?.copy(id = doc.id)
-            }.filter { it.status != "removed" }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
@@ -196,7 +399,8 @@ class ListingRepository {
         return try {
             val forWrite = listing.copy(
                 id = "",
-                reviewStatus = "under_review",
+                status = "under_review",
+                previousStatus = if (listing.status == "inactive") "inactive" else listing.previousStatus,
                 reviewedAt = null,
                 reviewedBy = "",
                 reviewNotes = "",
@@ -275,22 +479,30 @@ class ListingRepository {
     }
 
     suspend fun approveListing(listingId: String, adminUid: String, notes: String = "") {
-        updateListing(
-            listingId,
-            mapOf(
-                "reviewStatus" to "approved",
-                "reviewedAt" to Timestamp.now(),
-                "reviewedBy" to adminUid,
-                "reviewNotes" to notes
+        try {
+            val doc = db.collection("listings").document(listingId).get().await()
+            val previousStatus = doc.getString("previousStatus") ?: ""
+            val nextStatus = if (previousStatus == "inactive") "inactive" else "active"
+            updateListing(
+                listingId,
+                mapOf(
+                    "status" to nextStatus,
+                    "previousStatus" to "",
+                    "reviewedAt" to Timestamp.now(),
+                    "reviewedBy" to adminUid,
+                    "reviewNotes" to notes
+                )
             )
-        )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     suspend fun rejectListing(listingId: String, adminUid: String, notes: String = "") {
         updateListing(
             listingId,
             mapOf(
-                "reviewStatus" to "rejected",
+                "status" to "rejected",
                 "reviewedAt" to Timestamp.now(),
                 "reviewedBy" to adminUid,
                 "reviewNotes" to notes
@@ -302,11 +514,10 @@ class ListingRepository {
         updateListing(
             listingId,
             mapOf(
-                "reviewStatus" to "taken_down",
+                "status" to "delisted",
                 "reviewedAt" to Timestamp.now(),
                 "reviewedBy" to adminUid,
-                "reviewNotes" to notes,
-                "status" to "removed"
+                "reviewNotes" to notes
             )
         )
     }

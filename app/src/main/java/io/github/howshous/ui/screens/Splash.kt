@@ -16,12 +16,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import io.github.howshous.R
 import io.github.howshous.data.auth.AuthRepository
 import io.github.howshous.ui.data.clearSession
-import io.github.howshous.ui.data.readRoleFlow
-import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.data.saveRole
 import io.github.howshous.ui.data.saveUid
 import io.github.howshous.ui.theme.PrimaryTeal
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 
@@ -39,16 +36,6 @@ fun Splash(nav: NavController) {
         if (currentUser == null) {
             clearSession(context)
             nav.navigate("login_choice") {
-                popUpTo("splash") { inclusive = true }
-            }
-            return@LaunchedEffect
-        }
-
-        val storedUid = readUidFlow(context).first()
-        val storedRole = readRoleFlow(context).first()
-
-        if (storedUid == currentUser.uid && storedRole.isNotBlank()) {
-            nav.navigate("dashboard_router") {
                 popUpTo("splash") { inclusive = true }
             }
             return@LaunchedEffect
@@ -75,8 +62,9 @@ fun Splash(nav: NavController) {
                 return@LaunchedEffect
             }
             if (isBanned) {
-                AuthRepository(context).logout()
-                nav.navigate("login_choice") {
+                saveUid(context, currentUser.uid)
+                saveRole(context, "banned")
+                nav.navigate("dashboard_router") {
                     popUpTo("splash") { inclusive = true }
                 }
                 return@LaunchedEffect

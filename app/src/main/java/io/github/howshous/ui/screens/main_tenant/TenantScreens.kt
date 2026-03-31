@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -18,6 +21,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -145,6 +149,7 @@ fun TenantSearch(nav: NavController) {
     val listings by viewModel.filteredListings.collectAsState()
     val scope = rememberCoroutineScope()
     var sessionId by remember { mutableStateOf<String?>(null) }
+    var showSearch by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         sessionId = ensureSessionId(context)
@@ -182,100 +187,105 @@ fun TenantSearch(nav: NavController) {
 
         Spacer(Modifier.height(12.dp))
 
-        SearchBar(
-            query = query,
-            onQueryChange = {
-                viewModel.searchByLocation(it)
-                scope.launch {
-                    viewModel.logCurrentFilters(
-                        userId = uid,
-                        sessionId = sessionId
-                    )
-                }
-            },
-            placeholder = "Search by location..."
-        )
-        Spacer(Modifier.height(16.dp))
+        Text("Search & Filters", style = MaterialTheme.typography.titleMedium)
+        if (showSearch) {
+            SearchBar(
+                query = query,
+                onQueryChange = {
+                    viewModel.searchByLocation(it)
+                    scope.launch {
+                        viewModel.logCurrentFilters(
+                            userId = uid,
+                            sessionId = sessionId
+                        )
+                    }
+                },
+                placeholder = "Search by location..."
+            )
+            Spacer(Modifier.height(16.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Filters", style = MaterialTheme.typography.titleMedium)
-            if (hasActiveFilters) {
-                TextButton(onClick = { viewModel.clearFilters() }) {
-                    Text("Clear")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Filters", style = MaterialTheme.typography.titleMedium)
+                if (hasActiveFilters) {
+                    TextButton(onClick = { viewModel.clearFilters() }) {
+                        Text("Clear")
+                    }
                 }
             }
-        }
-        Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedTextField(
-                value = minPriceInput,
-                onValueChange = {
-                    viewModel.updateMinPriceInput(it)
-                    scope.launch {
-                        viewModel.logCurrentFilters(
-                            userId = uid,
-                            sessionId = sessionId
-                        )
-                    }
-                },
-                label = { Text("Min Price") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = io.github.howshous.ui.theme.InputShape,
-                colors = io.github.howshous.ui.theme.inputColors(),
-                modifier = Modifier.weight(1f)
-            )
-            OutlinedTextField(
-                value = maxPriceInput,
-                onValueChange = {
-                    viewModel.updateMaxPriceInput(it)
-                    scope.launch {
-                        viewModel.logCurrentFilters(
-                            userId = uid,
-                            sessionId = sessionId
-                        )
-                    }
-                },
-                label = { Text("Max Price") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = io.github.howshous.ui.theme.InputShape,
-                colors = io.github.howshous.ui.theme.inputColors(),
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(Modifier.height(12.dp))
-        Text("Amenities", style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.height(8.dp))
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(availableAmenities) { amenity ->
-                AmenityFilterChip(
-                    label = amenity,
-                    selected = selectedAmenities.contains(amenity),
-                    onSelectedChange = {
-                        viewModel.toggleAmenity(amenity)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = minPriceInput,
+                    onValueChange = {
+                        viewModel.updateMinPriceInput(it)
                         scope.launch {
                             viewModel.logCurrentFilters(
                                 userId = uid,
                                 sessionId = sessionId
                             )
                         }
-                    }
+                    },
+                    label = { Text("Min Price") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = io.github.howshous.ui.theme.InputShape,
+                    colors = io.github.howshous.ui.theme.inputColors(),
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = maxPriceInput,
+                    onValueChange = {
+                        viewModel.updateMaxPriceInput(it)
+                        scope.launch {
+                            viewModel.logCurrentFilters(
+                                userId = uid,
+                                sessionId = sessionId
+                            )
+                        }
+                    },
+                    label = { Text("Max Price") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = io.github.howshous.ui.theme.InputShape,
+                    colors = io.github.howshous.ui.theme.inputColors(),
+                    modifier = Modifier.weight(1f)
                 )
             }
-        }
 
-        Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
+            Text("Amenities", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(availableAmenities) { amenity ->
+                    AmenityFilterChip(
+                        label = amenity,
+                        selected = selectedAmenities.contains(amenity),
+                        onSelectedChange = {
+                            viewModel.toggleAmenity(amenity)
+                            scope.launch {
+                                viewModel.logCurrentFilters(
+                                    userId = uid,
+                                    sessionId = sessionId
+                                )
+                            }
+                        }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+        CollapseChevron(expanded = showSearch, onToggle = { showSearch = !showSearch })
+        Spacer(Modifier.height(8.dp))
 
         if (isLoading) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -503,5 +513,29 @@ fun TenantAccount(nav: NavController) {
         } else {
             Text("Profile not found", style = MaterialTheme.typography.bodyMedium)
         }
+    }
+}
+
+@Composable
+private fun CollapseChevron(expanded: Boolean, onToggle: () -> Unit) {
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "collapseChevron"
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggle() }
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Filled.KeyboardArrowDown,
+            contentDescription = if (expanded) "Collapse" else "Expand",
+            modifier = Modifier
+                .size(36.dp)
+                .rotate(rotation),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

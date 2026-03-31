@@ -19,6 +19,7 @@ import io.github.howshous.ui.components.BottomNavBar
 import io.github.howshous.ui.components.BottomNavItem
 import io.github.howshous.ui.components.TopBar
 import io.github.howshous.ui.screens.main_admin.AdminAccount
+import io.github.howshous.ui.screens.main_admin.AdminAppeals
 import io.github.howshous.ui.screens.main_admin.AdminHome
 import io.github.howshous.ui.screens.main_admin.AdminListings
 import io.github.howshous.ui.screens.main_admin.AdminReviewQueue
@@ -54,7 +55,7 @@ fun AdminMainShell(rootNav: NavHostController) {
             ) {
                 composable("admin_home") {
                     selectedRoute = "admin_home"
-                    AdminHome()
+                    AdminHome(innerNav)
                 }
                 composable("admin_review") {
                     selectedRoute = "admin_review"
@@ -71,6 +72,10 @@ fun AdminMainShell(rootNav: NavHostController) {
                 composable("admin_account") {
                     selectedRoute = "admin_account"
                     AdminAccount()
+                }
+                composable("admin_appeals") {
+                    selectedRoute = "admin_appeals"
+                    AdminAppeals()
                 }
             }
         }

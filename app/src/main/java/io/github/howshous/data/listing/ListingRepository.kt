@@ -12,7 +12,8 @@ data class Listing(
     val description: String,
     val price: Int,
     val deposit: Int = 0,
-    val status: String = "active",
+    val status: String = "under_review",
+    val previousStatus: String = "",
     val location: String = "",
     val photos: List<String> = listOf(),
     val createdAt: Timestamp = Timestamp.now(),
@@ -24,13 +25,16 @@ class ListingRepository {
 
     suspend fun createListing(listing: Listing): String {
         val id = if (listing.id.isBlank()) UUID.randomUUID().toString() else listing.id
+        val statusForWrite = "under_review"
+        val previousStatusForWrite = if (listing.status == "inactive") "inactive" else listing.previousStatus
         val map = hashMapOf<String, Any>(
             "landlordId" to listing.landlordId,
             "title" to listing.title,
             "description" to listing.description,
             "price" to listing.price,
             "deposit" to listing.deposit,
-            "status" to listing.status,
+            "status" to statusForWrite,
+            "previousStatus" to previousStatusForWrite,
             "location" to listing.location,
             "photos" to listing.photos,
             "createdAt" to listing.createdAt

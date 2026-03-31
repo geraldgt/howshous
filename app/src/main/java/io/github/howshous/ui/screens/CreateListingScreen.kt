@@ -639,7 +639,7 @@ fun CreateListingScreen(nav: NavController) {
                                                     price = priceValue,
                                                     deposit = depositValue,
                                                     capacity = capacityValue,
-                                                    status = "active",
+                                                    status = "under_review",
                                                     amenities = selectedAmenities.toList(),
                                                     photos = photoUrls,
                                                     landDeedUrl = deedUrl,

@@ -27,7 +27,7 @@ object SampleListingsGenerator {
             price = 4500,
             deposit = 9000,
             capacity = 1,
-            status = "active",
+            status = "under_review",
             amenities = listOf("WiFi", "Air Conditioning", "Furnished", "Near Public Transport", "Security")
         ),
         SampleListingTemplate(
@@ -37,7 +37,7 @@ object SampleListingsGenerator {
             price = 8000,
             deposit = 16000,
             capacity = 1,
-            status = "active",
+            status = "under_review",
             amenities = listOf("Free Parking", "WiFi", "Air Conditioning", "Kitchen Access", "Laundry", "CCTV", "Security")
         ),
         SampleListingTemplate(
@@ -47,7 +47,7 @@ object SampleListingsGenerator {
             price = 3000,
             deposit = 6000,
             capacity = 4,
-            status = "active",
+            status = "under_review",
             amenities = listOf("WiFi", "Kitchen Access", "Laundry", "Security")
         ),
         SampleListingTemplate(
@@ -57,7 +57,7 @@ object SampleListingsGenerator {
             price = 12000,
             deposit = 24000,
             capacity = 1,
-            status = "active",
+            status = "under_review",
             amenities = listOf("Free Parking", "WiFi", "Air Conditioning", "Gym Access", "Swimming Pool", "Furnished", "Security", "CCTV", "Kitchen Access", "Laundry")
         ),
         SampleListingTemplate(
@@ -67,7 +67,7 @@ object SampleListingsGenerator {
             price = 6000,
             deposit = 12000,
             capacity = 2,
-            status = "active",
+            status = "under_review",
             amenities = listOf("Pets Allowed", "Free Parking", "WiFi", "Air Conditioning", "Kitchen Access", "Laundry", "Security")
         ),
         SampleListingTemplate(
@@ -77,7 +77,7 @@ object SampleListingsGenerator {
             price = 3500,
             deposit = 7000,
             capacity = 6,
-            status = "active",
+            status = "under_review",
             amenities = listOf("WiFi", "Air Conditioning", "Security", "CCTV", "Near Public Transport")
         ),
         SampleListingTemplate(
@@ -87,7 +87,7 @@ object SampleListingsGenerator {
             price = 9500,
             deposit = 19000,
             capacity = 1,
-            status = "active",
+            status = "under_review",
             amenities = listOf("WiFi", "Air Conditioning", "Furnished", "Kitchen Access", "Laundry", "Security", "CCTV")
         ),
         SampleListingTemplate(
@@ -97,7 +97,7 @@ object SampleListingsGenerator {
             price = 5000,
             deposit = 10000,
             capacity = 1,
-            status = "active",
+            status = "under_review",
             amenities = listOf("WiFi", "Air Conditioning", "Near Public Transport", "Security", "Kitchen Access")
         ),
         SampleListingTemplate(
@@ -107,7 +107,7 @@ object SampleListingsGenerator {
             price = 4000,
             deposit = 8000,
             capacity = 3,
-            status = "active",
+            status = "under_review",
             amenities = listOf("WiFi", "Kitchen Access", "Laundry", "Security", "Near Public Transport")
         ),
         SampleListingTemplate(
@@ -117,7 +117,7 @@ object SampleListingsGenerator {
             price = 15000,
             deposit = 30000,
             capacity = 1,
-            status = "active",
+            status = "under_review",
             amenities = listOf("Free Parking", "WiFi", "Air Conditioning", "Gym Access", "Swimming Pool", "Furnished", "Security", "CCTV", "Kitchen Access", "Laundry")
         )
     )
@@ -151,10 +151,14 @@ object SampleListingsGenerator {
         "Security could be improved."
     )
     
-    suspend fun generateSampleListings(landlordId: String): List<String> {
+    suspend fun generateSampleListings(
+        landlordId: String,
+        titlePrefix: String? = null
+    ): List<String> {
         if (landlordId.isBlank()) return emptyList()
         val db = FirebaseFirestore.getInstance()
         val createdIds = mutableListOf<String>()
+        val normalizedPrefix = titlePrefix?.trim()?.takeIf { it.isNotBlank() }
 
         // First, delete existing sample listings for this landlord
         deleteExistingSampleListings(landlordId)
@@ -163,16 +167,21 @@ object SampleListingsGenerator {
         sampleListings.forEachIndexed { index, template ->
             val docRef = db.collection("listings").document()
             val now = Timestamp.now()
+            val finalTitle = if (normalizedPrefix != null) {
+                "$normalizedPrefix ${template.title}"
+            } else {
+                template.title
+            }
             val listingMap = hashMapOf<String, Any>(
                 "landlordId" to landlordId,
-                "title" to template.title,
+                "title" to finalTitle,
                 "description" to template.description,
                 "location" to template.location,
                 "price" to template.price,
                 "deposit" to template.deposit,
                 "capacity" to template.capacity,
                 "status" to template.status,
-                "reviewStatus" to "under_review",
+                "previousStatus" to "",
                 "reviewedBy" to "",
                 "reviewNotes" to "",
                 "amenities" to template.amenities,

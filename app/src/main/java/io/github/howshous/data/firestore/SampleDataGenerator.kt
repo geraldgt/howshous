@@ -42,7 +42,6 @@ object SampleDataGenerator {
             price = 25000,
             deposit = 50000,
             status = "active",
-            reviewStatus = "under_review",
             reviewSummary = ListingReviewSummary(
                 total = 50,
                 recommendedCount = 47,
@@ -62,8 +61,7 @@ object SampleDataGenerator {
             location = "Bangalore, Koramangala",
             price = 18000,
             deposit = 36000,
-            status = "active",
-            reviewStatus = "under_review",
+            status = "under_review",
             reviewSummary = ListingReviewSummary(
                 total = 24,
                 recommendedCount = 18,
@@ -83,8 +81,7 @@ object SampleDataGenerator {
             location = "Bangalore, Indiranagar",
             price = 45000,
             deposit = 90000,
-            status = "full",
-            reviewStatus = "under_review",
+            status = "inactive",
             reviewSummary = ListingReviewSummary(
                 total = 22,
                 recommendedCount = 10,

@@ -58,7 +58,8 @@ val slightlyGray = Color(0xFF7D7D7D)
 val OnSurfaceVariant = Color(0xFF49454F)
 
 // Review scale
+val ReviewDarkRed = Color(0xFF640D0D)
 val ReviewRed = Color(0xFFC62828)
 val ReviewOrange = Color(0xFFF57C00)
-val ReviewGreen = Color(0xFF2E7D32)
-val ReviewBlue = Color(0xFF1565C0)
+val ReviewGreen = Color(0xFF35943B)
+val ReviewBlue = Color(0xFF317DD0)

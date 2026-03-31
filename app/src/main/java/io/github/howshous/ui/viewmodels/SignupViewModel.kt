@@ -132,6 +132,10 @@ class SignupViewModel : ViewModel() {
                 "email" to email,
                 "role" to "tenant",
                 "verified" to false,
+                "isBanned" to false,
+                "bannedAt" to null,
+                "bannedBy" to "",
+                "banReason" to "",
                 "profileImageUrl" to profileUrl,
                 "businessPermitUrl" to ""
             )
@@ -214,6 +218,10 @@ class SignupViewModel : ViewModel() {
                 "email" to email,
                 "role" to "landlord",
                 "verified" to false,
+                "isBanned" to false,
+                "bannedAt" to null,
+                "bannedBy" to "",
+                "banReason" to "",
                 "profileImageUrl" to profileUrl,
                 "businessPermitUrl" to propertyVerificationUrl
             )

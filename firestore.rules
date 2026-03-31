@@ -16,10 +16,15 @@ service cloud.firestore {
       );
     }
 
+    function isBanned() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAny(["isBanned"])
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBanned == true;
+    }
+
     function isListingPublic(listingData) {
-      return (listingData.reviewStatus == "approved"
-        || !listingData.keys().hasAny(["reviewStatus"]))
-        && listingData.status != "removed";
+      return listingData.status == "active";
     }
 
     function isSampleAdminBootstrap() {
@@ -47,54 +52,68 @@ service cloud.firestore {
         && request.resource.data.uniqueViewCount == currentViews + 1;
     }
 
+    function isStatusToggleOnly() {
+      let changedKeys = request.resource.data.diff(resource.data).changedKeys();
+      return changedKeys.hasOnly(["status", "updatedAt"]);
+    }
+
     // Raw analytics events: clients can write, but never read.
     match /events/{eventId} {
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && !isBanned();
       allow read, update, delete: if false;
     }
 
     // Daily listing stats: landlords can read and write their own stats (e.g. seed data when using emulator without Functions).
     match /listing_daily_stats/{listingId} {
       match /days/{date} {
-        allow read, create, update: if isLandlordForListing(listingId);
+        allow read, create, update: if isLandlordForListing(listingId) && !isBanned();
         allow delete: if false;
       }
     }
 
     match /listings/{listingId} {
-      allow read: if isListingPublic(resource.data)
+      allow read: if (isListingPublic(resource.data) && !isBanned())
         || isAdmin()
-        || (isSignedIn() && resource.data.landlordId == request.auth.uid);
+        || (isSignedIn() && !isBanned() && resource.data.landlordId == request.auth.uid);
       allow create: if isSignedIn()
+        && !isBanned()
         && request.resource.data.landlordId == request.auth.uid
-        && request.resource.data.reviewStatus == "under_review";
-      allow update: if isSignedIn() && (
+        && request.resource.data.status == "under_review";
+      allow update: if isSignedIn() && !isBanned() && (
           isAdmin()
           || isUniqueViewIncrement()
           || (
             isLandlordForListing(listingId)
-            && request.resource.data.reviewStatus != "approved"
-            && request.resource.data.reviewStatus != "rejected"
-            && request.resource.data.reviewStatus != "taken_down"
+            && (
+              request.resource.data.status == "under_review"
+              || (
+                isStatusToggleOnly()
+                && resource.data.status in ["active", "inactive"]
+                && request.resource.data.status in ["active", "inactive"]
+              )
+            )
           )
         );
-      allow delete: if isSignedIn() && (isLandlordForListing(listingId) || isAdmin());
+      allow delete: if isSignedIn() && !isBanned() && (isLandlordForListing(listingId) || isAdmin());
 
       match /views/{viewerId} {
         allow read: if isSignedIn()
+          && !isBanned()
           && (request.auth.uid == viewerId || isLandlordForListing(listingId));
         allow create: if isSignedIn()
+          && !isBanned()
           && request.auth.uid == viewerId
           && request.resource.data.viewerId == viewerId;
         allow update, delete: if false;
       }
 
       match /reviews/{reviewId} {
-        allow read: if isListingPublic(get(/databases/$(database)/documents/listings/$(listingId)).data)
+        allow read: if (isListingPublic(get(/databases/$(database)/documents/listings/$(listingId)).data) && !isBanned())
           || isAdmin()
           || isLandlordForListing(listingId)
-          || (isSignedIn() && request.auth.uid == resource.data.reviewerId);
+          || (isSignedIn() && !isBanned() && request.auth.uid == resource.data.reviewerId);
         allow create: if isSignedIn()
+          && !isBanned()
           && request.resource.data.listingId == listingId
           && (
             request.auth.uid == request.resource.data.reviewerId
@@ -109,9 +128,11 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isAdmin() || (isSignedIn()
-        && (request.auth.uid == userId || resource.data.role == "landlord"));
+      allow read: if isAdmin()
+        || (isSignedIn() && request.auth.uid == userId)
+        || (isSignedIn() && !isBanned() && resource.data.role == "landlord");
       allow create: if isSignedIn()
+        && !isBanned()
         && request.auth.uid == userId
         && (
           request.resource.data.role in ["tenant", "landlord"]
@@ -119,43 +140,49 @@ service cloud.firestore {
         );
       allow update: if isAdmin() || (
           isSignedIn()
+          && !isBanned()
           && request.auth.uid == userId
           && !request.resource.data.diff(resource.data).changedKeys().hasAny(["role", "isBanned", "bannedAt", "bannedBy", "banReason"])
         );
       allow delete: if false;
 
       match /saved_listings/{listingId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+        allow read, write: if isSignedIn() && !isBanned() && request.auth.uid == userId;
       }
     }
 
     match /verifications/{userId} {
-      allow read: if isSignedIn() && request.auth.uid == userId;
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSignedIn() && !isBanned() && request.auth.uid == userId;
+      allow create: if isSignedIn() && !isBanned() && request.auth.uid == userId;
+      allow update: if isSignedIn() && !isBanned() && request.auth.uid == userId;
       allow delete: if false;
     }
 
     function isChatParticipant(chatData) {
       return isSignedIn()
+        && !isBanned()
         && (chatData.tenantId == request.auth.uid || chatData.landlordId == request.auth.uid);
     }
 
     match /chats/{chatId} {
       allow create: if isSignedIn()
+        && !isBanned()
         && request.resource.data.tenantId == request.auth.uid
         && request.resource.data.landlordId != null
         && request.resource.data.listingId != null
         && listingBelongsToLandlord(request.resource.data.listingId, request.resource.data.landlordId);
       allow read, update: if isSignedIn()
+        && !isBanned()
         && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid);
       allow delete: if false;
 
       match /messages/{messageId} {
         allow read: if isSignedIn()
+          && !isBanned()
           && (get(/databases/$(database)/documents/chats/$(chatId)).data.tenantId == request.auth.uid
               || get(/databases/$(database)/documents/chats/$(chatId)).data.landlordId == request.auth.uid);
         allow create: if isSignedIn()
+          && !isBanned()
           && (get(/databases/$(database)/documents/chats/$(chatId)).data.tenantId == request.auth.uid
               || get(/databases/$(database)/documents/chats/$(chatId)).data.landlordId == request.auth.uid)
           && request.resource.data.senderId == request.auth.uid;
@@ -164,24 +191,26 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && !isBanned() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn()
+        && !isBanned()
         && (
           request.resource.data.userId == request.auth.uid
           || (request.resource.data.listingId != null && isLandlordForListing(request.resource.data.listingId))
         );
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && !isBanned() && resource.data.userId == request.auth.uid;
       allow delete: if false;
     }
 
     match /aiChats/{userId} {
-      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSignedIn() && !isBanned() && request.auth.uid == userId;
       allow create: if false;
       allow update, delete: if false;
 
       match /messages/{messageId} {
-        allow read: if isSignedIn() && request.auth.uid == userId;
+        allow read: if isSignedIn() && !isBanned() && request.auth.uid == userId;
         allow create: if isSignedIn()
+          && !isBanned()
           && request.auth.uid == userId
           && request.resource.data.userId == userId;
         allow update, delete: if false;
@@ -190,6 +219,7 @@ service cloud.firestore {
 
     match /contracts/{contractId} {
       allow read: if isSignedIn()
+        && !isBanned()
         && (
           (resource.data.keys().hasAll(["tenantId", "landlordId"])
             && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid))
@@ -199,6 +229,7 @@ service cloud.firestore {
           )
         );
       allow create: if isSignedIn()
+        && !isBanned()
         && request.auth.uid == request.resource.data.landlordId
         && request.resource.data.listingId != null
         && request.resource.data.chatId != null
@@ -207,6 +238,7 @@ service cloud.firestore {
         && listingBelongsToLandlord(request.resource.data.listingId, request.resource.data.landlordId)
         && get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data.listingId == request.resource.data.listingId;
       allow update: if isSignedIn()
+        && !isBanned()
         && resource.data.keys().hasAll(["tenantId", "landlordId"])
         && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid)
         && listingBelongsToLandlord(resource.data.listingId, resource.data.landlordId);
@@ -215,8 +247,10 @@ service cloud.firestore {
 
     match /issues/{issueId} {
       allow read: if isSignedIn()
+        && !isBanned()
         && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid);
       allow create: if isSignedIn()
+        && !isBanned()
         && request.resource.data.tenantId == request.auth.uid
         && request.resource.data.contractId != null
         && request.resource.data.listingId != null
@@ -225,14 +259,17 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/contracts/$(request.resource.data.contractId)).data.landlordId == request.resource.data.landlordId
         && get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data.listingId == request.resource.data.listingId;
       allow update: if isSignedIn()
+        && !isBanned()
         && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid);
       allow delete: if false;
     }
 
     match /tenancies/{tenancyId} {
       allow read: if isSignedIn()
+        && !isBanned()
         && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid);
       allow create, update: if isSignedIn()
+        && !isBanned()
         && (request.resource.data.tenantId == request.auth.uid || request.resource.data.landlordId == request.auth.uid)
         && listingBelongsToLandlord(request.resource.data.listingId, request.resource.data.landlordId)
         && request.resource.data.contractId != null
@@ -242,8 +279,24 @@ service cloud.firestore {
 
     match /rentals/{rentalId} {
       allow read: if isSignedIn()
+        && !isBanned()
         && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid);
       allow create, update, delete: if false;
+    }
+
+    match /ban_appeals/{appealId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && request.auth.uid == resource.data.userId);
+      allow create: if isSignedIn()
+        && request.auth.uid == request.resource.data.userId
+        && request.resource.data.status == "pending"
+        && request.resource.data.reviewedAt == null
+        && request.resource.data.reviewedBy == ""
+        && request.resource.data.reviewNotes == "";
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).changedKeys()
+          .hasOnly(["status", "reviewedAt", "reviewedBy", "reviewNotes"]);
+      allow delete: if false;
     }
   }
 }

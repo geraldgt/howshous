@@ -19,6 +19,17 @@ data class UserProfile(
     val createdAt: Timestamp? = null
 )
 
+data class BanAppeal(
+    val id: String = "",
+    val userId: String = "",
+    val message: String = "",
+    val status: String = "pending", // pending, approved, rejected
+    val createdAt: Timestamp? = null,
+    val reviewedAt: Timestamp? = null,
+    val reviewedBy: String = "",
+    val reviewNotes: String = ""
+)
+
 data class Listing(
     val id: String = "",
     val landlordId: String = "",
@@ -28,8 +39,8 @@ data class Listing(
     val price: Int = 0,
     val deposit: Int = 0,
     val capacity: Int = 1,
-    val status: String = "active", // active, full, maintenance
-    val reviewStatus: String = "approved", // under_review, approved, rejected, taken_down
+    val status: String = "under_review", // under_review, rejected, active, inactive, delisted
+    val previousStatus: String = "", // active/inactive before under_review
     val reviewedAt: Timestamp? = null,
     val reviewedBy: String = "",
     val reviewNotes: String = "",
@@ -40,6 +51,7 @@ data class Listing(
     val createdAt: Timestamp? = null,
     val updatedAt: Timestamp? = null,
     val uniqueViewCount: Int = 0,
+    val isSample: Boolean = false,
     val contractTemplate: Map<String, Any>? = null
 )
 

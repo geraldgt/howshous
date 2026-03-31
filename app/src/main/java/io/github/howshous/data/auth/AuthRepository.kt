@@ -43,6 +43,10 @@ class AuthRepository(private val context: Context) {
                 "email" to user.email,
                 "phone" to (user.phone ?: ""),
                 "role" to user.role,
+                "isBanned" to false,
+                "bannedAt" to null,
+                "bannedBy" to "",
+                "banReason" to "",
                 "profileImageUrl" to "",
                 "verified" to false,
                 "createdAt" to Timestamp.now()
@@ -67,8 +71,9 @@ class AuthRepository(private val context: Context) {
             val role = doc.getString("role") ?: ""
             val isBanned = doc.getBoolean("isBanned") ?: false
             if (isBanned) {
-                auth.signOut()
-                return Result.failure(IllegalStateException("This account has been banned."))
+                saveRole(context, "banned")
+                saveUid(context, uid)
+                return Result.success(uid)
             }
             saveRole(context, role)
             saveUid(context, uid)
