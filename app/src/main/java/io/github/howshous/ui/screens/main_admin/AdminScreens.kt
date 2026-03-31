@@ -1,5 +1,6 @@
 package io.github.howshous.ui.screens.main_admin
 
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,6 +68,7 @@ import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.theme.SurfaceLight
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminHome(nav: NavController) {
     val listingRepo = remember { ListingRepository() }
@@ -148,6 +150,7 @@ private fun KPI(label: String, value: String, onClick: (() -> Unit)? = null) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminReviewQueue(nav: NavController) {
     var listings by remember { mutableStateOf<List<Listing>>(emptyList()) }
@@ -253,6 +256,7 @@ fun AdminReviewQueue(nav: NavController) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminListings(nav: NavController) {
     var listings by remember { mutableStateOf<List<Listing>>(emptyList()) }
@@ -411,7 +415,7 @@ fun AdminUsers() {
                 if (snap != null) {
                     allUsers = snap.documents.mapNotNull { doc ->
                         doc.toObject(UserProfile::class.java)?.copy(uid = doc.id)
-                    }.filter { it.role == "tenant" || it.role == "landlord" }
+                    }.filter { it.role == "tenant" || it.role == "landlord" || it.role == "banned" }
                         .sortedBy { it.role }
                     isLoading = false
                 }
@@ -420,7 +424,7 @@ fun AdminUsers() {
     }
 
     val normalizedQuery = searchQuery.trim().lowercase()
-    val baseUsers = allUsers.filter { it.role == "tenant" || it.role == "landlord" }
+    val baseUsers = allUsers.filter { it.role == "tenant" || it.role == "landlord" || it.role == "banned" }
     val searchedUsers = if (normalizedQuery.isBlank()) {
         baseUsers
     } else {
@@ -441,8 +445,8 @@ fun AdminUsers() {
         "active" -> roleFiltered.filter { !it.isBanned }
         else -> roleFiltered
     }
-    val landlords = statusFiltered.filter { it.role == "landlord" }
-    val tenants = statusFiltered.filter { it.role == "tenant" }
+    val landlords = statusFiltered.filter { it.role == "landlord" || (it.role == "banned" && it.originalRole == "landlord") }
+    val tenants = statusFiltered.filter { it.role == "tenant" || (it.role == "banned" && it.originalRole == "tenant") }
 
     Column(
         modifier = Modifier
@@ -743,6 +747,7 @@ fun AdminUsers() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminAppeals() {
     val context = LocalContext.current
@@ -859,6 +864,7 @@ fun AdminAppeals() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminAccount() {
     val context = LocalContext.current

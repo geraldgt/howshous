@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +25,9 @@ import io.github.howshous.ui.screens.main_admin.AdminHome
 import io.github.howshous.ui.screens.main_admin.AdminListings
 import io.github.howshous.ui.screens.main_admin.AdminReviewQueue
 import io.github.howshous.ui.screens.main_admin.AdminUsers
+import androidx.compose.material3.ExperimentalMaterial3Api
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 
 @Composable
 fun AdminMainShell(rootNav: NavHostController) {

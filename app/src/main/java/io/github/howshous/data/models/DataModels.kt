@@ -10,6 +10,7 @@ data class UserProfile(
     val phone: String = "",
     val role: String = "tenant",
     val isBanned: Boolean = false,
+    val originalRole: String = "",  // Stores the original role when user is banned
     val bannedAt: Timestamp? = null,
     val bannedBy: String = "",
     val banReason: String = "",

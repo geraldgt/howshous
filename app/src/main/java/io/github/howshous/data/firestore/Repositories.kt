@@ -84,9 +84,13 @@ class UserRepository {
         try {
             val userDoc = db.collection("users").document(uid).get().await()
             val role = userDoc.getString("role") ?: ""
+            val originalRole = userDoc.getString("originalRole") ?: role  // Fallback to current role if not set
+            
             val updates = if (banned) {
                 mapOf(
                     "isBanned" to true,
+                    "role" to "banned",  // Set role to banned
+                    "originalRole" to role,  // Store the original role to restore later
                     "bannedAt" to Timestamp.now(),
                     "bannedBy" to adminUid,
                     "banReason" to reason
@@ -94,13 +98,14 @@ class UserRepository {
             } else {
                 mapOf(
                     "isBanned" to false,
+                    "role" to originalRole,  // Restore to original role
                     "bannedAt" to null,
                     "bannedBy" to "",
                     "banReason" to ""
                 )
             }
             db.collection("users").document(uid).update(updates).await()
-            if (role == "landlord") {
+            if (role == "landlord" || (banned && originalRole == "landlord")) {
                 if (banned) {
                     delistLandlordListings(uid, adminUid, reason)
                 } else {

@@ -31,51 +31,76 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.github.howshous.data.auth.AuthRepository
 import io.github.howshous.data.firestore.BanAppealRepository
-import io.github.howshous.data.firestore.UserRepository
 import io.github.howshous.data.models.BanAppeal
-import io.github.howshous.data.models.UserProfile
 import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.data.saveRole
 import io.github.howshous.ui.theme.SurfaceLight
 import kotlinx.coroutines.launch
-
+import kotlinx.coroutines.delay
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 @Composable
 fun BannedAccountScreen(nav: NavController) {
     val context = LocalContext.current
     val uid by readUidFlow(context).collectAsState(initial = "")
-    val userRepo = remember { UserRepository() }
     val appealRepo = remember { BanAppealRepository() }
     val scope = rememberCoroutineScope()
 
-    var profile by remember { mutableStateOf<UserProfile?>(null) }
     var appeals by remember { mutableStateOf<List<BanAppeal>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isSubmitting by remember { mutableStateOf(false) }
     var appealMessage by remember { mutableStateOf("") }
     var feedback by remember { mutableStateOf("") }
+    var lastRefreshTime by remember { mutableStateOf(0L) }
+    var hasNavigated by remember { mutableStateOf(false) }
+    var banReason by remember { mutableStateOf("Not specified") }
+    var bannedAt by remember { mutableStateOf("Unknown") }
 
     fun refresh() {
-        if (uid.isBlank()) return
-        scope.launch {
-            isLoading = true
-            profile = userRepo.getUserProfile(uid)
-            appeals = appealRepo.getAppealsForUser(uid)
-            isLoading = false
+        if (uid.isBlank() || hasNavigated) return
+        val now = System.currentTimeMillis()
+        // Prevent refresh from being called more than once every 5 seconds
+        if (now - lastRefreshTime < 5000) return
+        lastRefreshTime = now
 
-            val loadedProfile = profile
-            if (loadedProfile != null && !loadedProfile.isBanned) {
-                // Ban has been lifted - save role and navigate to correct dashboard
-                saveRole(context, loadedProfile.role)
-                // Use popUpTo to clear the backstack and prevent returning to banned screen
-                nav.navigate("dashboard_router") {
-                    popUpTo("login_choice") { inclusive = false }
-                    launchSingleTop = true
+        scope.launch {
+            try {
+                isLoading = true
+                
+                // Fetch ban info directly from Firestore to avoid deserialization errors
+                val db = FirebaseFirestore.getInstance()
+                val userDoc = db.collection("users").document(uid).get().await()
+                val isBanned = userDoc.getBoolean("isBanned") ?: true
+                val role = userDoc.getString("role") ?: "banned"
+                
+                // Update ban info
+                banReason = userDoc.getString("banReason") ?: "Not specified"
+                bannedAt = userDoc.getTimestamp("bannedAt")?.toDate()?.toString() ?: "Unknown"
+                
+                // If ban has been lifted, navigate away
+                if (!isBanned && role != "banned" && !hasNavigated) {
+                    saveRole(context, role)
+                    hasNavigated = true
+                    nav.navigate("dashboard_router") {
+                        launchSingleTop = true
+                    }
+                    return@launch
                 }
+                
+                // Fetch appeals
+                appeals = appealRepo.getAppealsForUser(uid)
+                isLoading = false
+            } catch (e: Exception) {
+                // Silently handle errors to prevent loops
+                e.printStackTrace()
+                isLoading = false
             }
         }
     }
 
     LaunchedEffect(uid) {
+        hasNavigated = false
+        lastRefreshTime = 0
         refresh()
     }
 
@@ -99,10 +124,9 @@ fun BannedAccountScreen(nav: NavController) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        "Reason: ${profile?.banReason?.ifBlank { "Not specified" } ?: "Not specified"}",
+                        "Reason: ${banReason.ifBlank { "Not specified" }}",
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    val bannedAt = profile?.bannedAt?.toDate()?.toString() ?: "Unknown"
                     Text("Banned at: $bannedAt", style = MaterialTheme.typography.bodySmall)
                 }
             }

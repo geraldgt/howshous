@@ -14,6 +14,7 @@ import io.github.howshous.ui.theme.AdminPower
 import io.github.howshous.ui.theme.LandlordBlue
 import io.github.howshous.ui.theme.TenantGreen
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopBar(
     role: String,
