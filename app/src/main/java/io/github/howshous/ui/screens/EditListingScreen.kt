@@ -5,8 +5,11 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,17 +23,27 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -47,6 +60,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -245,15 +259,19 @@ fun EditListingScreen(nav: NavController, listingId: String = "") {
         }
     }
 
+    val landlordAccent = Color(0xFF3B82F6)
+    val landlordAccentOn = Color.White
+    
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(SurfaceLight)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
         ) {
+            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -261,259 +279,483 @@ fun EditListingScreen(nav: NavController, listingId: String = "") {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 DebouncedIconButton(onClick = { nav.popBackStack() }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(24.dp))
                 }
-                Text("Edit Listing", style = MaterialTheme.typography.titleMedium)
+                Text("Edit Listing", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(start = 8.dp))
             }
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Property Title") },
-                    shape = InputShape,
-                    colors = inputColors(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
 
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Description") },
-                    shape = InputShape,
-                    colors = inputColors(),
+                // Basic Information Section
+                Text(
+                    text = "Property Information",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    ),
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    maxLines = 3
-                )
-                Spacer(Modifier.height(12.dp))
-
-                ExposedDropdownMenuBox(
-                    expanded = locationExpanded,
-                    onExpandedChange = { locationExpanded = !locationExpanded }
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    OutlinedTextField(
-                        value = location,
-                        onValueChange = { },
-                        readOnly = true,
-                        label = { Text("Location (Baguio City)") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = locationExpanded) },
-                        shape = InputShape,
-                        colors = inputColors(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = locationExpanded,
-                        onDismissRequest = { locationExpanded = false }
-                    ) {
-                        baguioLocations.forEach { loc ->
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text(loc) },
-                                onClick = {
-                                    location = loc
-                                    locationExpanded = false
-                                }
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = title,
+                            onValueChange = { title = it },
+                            label = { Text("Property Title") },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = inputColors(),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = description,
+                            onValueChange = { description = it },
+                            label = { Text("Description") },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = inputColors(),
+                            modifier = Modifier.fillMaxWidth(),
+                            maxLines = 4,
+                            minLines = 3
+                        )
+
+                        ExposedDropdownMenuBox(
+                            expanded = locationExpanded,
+                            onExpandedChange = { locationExpanded = !locationExpanded }
+                        ) {
+                            OutlinedTextField(
+                                value = location,
+                                onValueChange = { },
+                                readOnly = true,
+                                label = { Text("Location") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = locationExpanded) },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = inputColors(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor()
                             )
+                            ExposedDropdownMenu(
+                                expanded = locationExpanded,
+                                onDismissRequest = { locationExpanded = false }
+                            ) {
+                                baguioLocations.forEach { loc ->
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text(loc) },
+                                        onClick = {
+                                            location = loc
+                                            locationExpanded = false
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(
-                        value = price,
-                        onValueChange = { price = it },
-                        label = { Text("Monthly Rent") },
-                        shape = InputShape,
-                        colors = inputColors(),
-                        modifier = Modifier.weight(1f)
-                    )
+                Spacer(Modifier.height(20.dp))
 
-                    OutlinedTextField(
-                        value = deposit,
-                        onValueChange = { deposit = it },
-                        label = { Text("Deposit") },
-                        shape = InputShape,
-                        colors = inputColors(),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = capacity,
-                    onValueChange = { capacity = it.filter { c -> c.isDigit() } },
-                    label = { Text("Capacity (tenants)") },
-                    shape = InputShape,
-                    colors = inputColors(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(Modifier.height(16.dp))
-
+                // Pricing & Capacity Section
                 Text(
-                    text = "Amenities",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    text = "Pricing & Capacity",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    ),
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.onBackground
                 )
 
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    items(availableAmenities) { amenity ->
-                        FilterChip(
-                            selected = selectedAmenities.contains(amenity),
-                            onClick = {
-                                selectedAmenities = if (selectedAmenities.contains(amenity)) {
-                                    selectedAmenities - amenity
-                                } else {
-                                    selectedAmenities + amenity
-                                }
-                            },
-                            label = { Text(amenity, style = MaterialTheme.typography.labelSmall) }
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = price,
+                                onValueChange = { price = it },
+                                label = { Text("Monthly Rent") },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = inputColors(),
+                                modifier = Modifier.weight(1f),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+
+                            OutlinedTextField(
+                                value = deposit,
+                                onValueChange = { deposit = it },
+                                label = { Text("Deposit") },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = inputColors(),
+                                modifier = Modifier.weight(1f),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value = capacity,
+                            onValueChange = { capacity = it.filter { c -> c.isDigit() } },
+                            label = { Text("Capacity (tenants)") },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = inputColors(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(20.dp))
 
+                // Amenities Section
+                Text(
+                    text = "Amenities",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    ),
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(availableAmenities) { amenity ->
+                                FilterChip(
+                                    selected = selectedAmenities.contains(amenity),
+                                    onClick = {
+                                        selectedAmenities = if (selectedAmenities.contains(amenity)) {
+                                            selectedAmenities - amenity
+                                        } else {
+                                            selectedAmenities + amenity
+                                        }
+                                    },
+                                    label = { Text(amenity, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                // Contract Template Section
                 Text(
                     text = "Contract Template",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    ),
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.onBackground
                 )
 
-                OutlinedTextField(
-                    value = contractTitle,
-                    onValueChange = { contractTitle = it },
-                    label = { Text("Contract Title") },
-                    shape = InputShape,
-                    colors = inputColors(),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = contractTitle,
+                            onValueChange = { contractTitle = it },
+                            label = { Text("Contract Title") },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = inputColors(),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
 
-                Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = contractTerms,
+                            onValueChange = { contractTerms = it },
+                            label = { Text("Contract Terms") },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = inputColors(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 140.dp),
+                            maxLines = 6
+                        )
+                    }
+                }
 
-                OutlinedTextField(
-                    value = contractTerms,
-                    onValueChange = { contractTerms = it },
-                    label = { Text("Contract Terms") },
-                    shape = InputShape,
-                    colors = inputColors(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 140.dp),
-                    maxLines = 6
-                )
+                Spacer(Modifier.height(20.dp))
 
-                Spacer(Modifier.height(24.dp))
-
+                // Listing Photos Section
                 Text(
                     text = "Listing Photos",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    ),
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.onBackground
                 )
 
-                Row(
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Button(
-                        onClick = { cameraLauncher.launch(null) },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Take Photo")
-                    }
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            "Add or update photos of the property",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                    Button(
-                        onClick = { photoPicker.launch("image/*") },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(if (selectedPhotoUris.isEmpty()) "Choose Photos" else "Add Photos")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Button(
+                                onClick = { cameraLauncher.launch(null) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = landlordAccent.copy(alpha = 0.1f),
+                                    contentColor = landlordAccent
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.5.dp, landlordAccent)
+                            ) {
+                                Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.size(8.dp))
+                                Text("Take")
+                            }
+
+                            Button(
+                                onClick = { photoPicker.launch("image/*") },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = landlordAccent.copy(alpha = 0.1f),
+                                    contentColor = landlordAccent
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.5.dp, landlordAccent)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.size(8.dp))
+                                Text("Browse")
+                            }
+                        }
+
+                        val hasAnyPhotos = existingPhotoUrls.isNotEmpty() || selectedPhotoUris.isNotEmpty()
+                        if (hasAnyPhotos) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Current photos",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = landlordAccent
+                            )
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(existingPhotoUrls) { url ->
+                                    Box(modifier = Modifier.size(100.dp)) {
+                                        AsyncImage(
+                                            model = url,
+                                            contentDescription = "Listing photo",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(100.dp)
+                                                .background(
+                                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                                    shape = RoundedCornerShape(8.dp)
+                                                )
+                                        )
+                                    }
+                                }
+                                items(selectedPhotoUris) { uri ->
+                                    Box(modifier = Modifier.size(100.dp)) {
+                                        AsyncImage(
+                                            model = uri,
+                                            contentDescription = "New listing photo",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(100.dp)
+                                                .background(
+                                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                                    shape = RoundedCornerShape(8.dp)
+                                                )
+                                        )
+                                        IconButton(
+                                            onClick = {
+                                                selectedPhotoUris = selectedPhotoUris.filter { it != uri }
+                                            },
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .align(Alignment.TopEnd)
+                                                .padding(4.dp)
+                                                .background(
+                                                    color = Color.Black.copy(alpha = 0.6f),
+                                                    shape = CircleShape
+                                                )
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = "Remove photo",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
-                val hasAnyPhotos = existingPhotoUrls.isNotEmpty() || selectedPhotoUris.isNotEmpty()
-                if (hasAnyPhotos) {
-                    Spacer(Modifier.height(12.dp))
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(existingPhotoUrls) { url ->
-                            AsyncImage(
-                                model = url,
-                                contentDescription = "Listing photo",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(120.dp)
-                            )
-                        }
-                        items(selectedPhotoUris) { uri ->
-                            AsyncImage(
-                                model = uri,
-                                contentDescription = "Listing photo",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(120.dp)
-                            )
-                        }
-                    }
-                }
+                Spacer(Modifier.height(20.dp))
 
-                Spacer(Modifier.height(24.dp))
-
+                // Land Deed Section
                 Text(
-                    text = "Land Deed (Proof of Ownership)",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    text = "Ownership Proof",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    ),
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.onBackground
                 )
 
-                Row(
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Button(
-                        onClick = { landDeedCameraLauncher.launch(null) },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Take Photo")
-                    }
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            "Upload or update your land deed or proof of ownership",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                    Button(
-                        onClick = { landDeedGalleryLauncher.launch("image/*") },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(if (landDeedUri == null) "Choose Photo" else "Replace Photo")
-                    }
-                }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Button(
+                                onClick = { landDeedCameraLauncher.launch(null) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = landlordAccent.copy(alpha = 0.1f),
+                                    contentColor = landlordAccent
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.5.dp, landlordAccent)
+                            ) {
+                                Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.size(8.dp))
+                                Text("Take")
+                            }
 
-                val deedPreviewUrl = landDeedUri ?: existingLandDeedUrl.takeIf { it.isNotBlank() }
-                if (deedPreviewUrl != null) {
-                    Spacer(Modifier.height(12.dp))
-                    AsyncImage(
-                        model = deedPreviewUrl,
-                        contentDescription = "Land deed photo",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                    )
+                            Button(
+                                onClick = { landDeedGalleryLauncher.launch("image/*") },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = landlordAccent.copy(alpha = 0.1f),
+                                    contentColor = landlordAccent
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.5.dp, landlordAccent)
+                            ) {
+                                Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.size(8.dp))
+                                Text("Browse")
+                            }
+                        }
+
+                        val deedPreviewUrl = landDeedUri ?: existingLandDeedUrl.takeIf { it.isNotBlank() }
+                        if (deedPreviewUrl != null) {
+                            Spacer(Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(140.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                            ) {
+                                AsyncImage(
+                                    model = deedPreviewUrl,
+                                    contentDescription = "Land deed photo",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(140.dp)
+                                )
+                                if (landDeedUri != null) {
+                                    IconButton(
+                                        onClick = { landDeedUri = null },
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .align(Alignment.TopEnd)
+                                            .padding(4.dp)
+                                            .background(
+                                                color = Color.Black.copy(alpha = 0.6f),
+                                                shape = CircleShape
+                                            )
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Remove deed",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Spacer(Modifier.height(24.dp))
 
+                // Submit Button
                 Button(
                     onClick = {
                         if (isSubmitting) return@Button
@@ -627,16 +869,21 @@ fun EditListingScreen(nav: NavController, listingId: String = "") {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
-                    enabled = title.isNotEmpty() && location.isNotEmpty() && price.isNotEmpty() && capacity.isNotEmpty() && !isSubmitting
+                    enabled = title.isNotEmpty() && location.isNotEmpty() && price.isNotEmpty() && capacity.isNotEmpty() && !isSubmitting,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = landlordAccent,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
                     if (isSubmitting) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            color = Color.White
                         )
                     } else {
-                        Text("Save Changes")
+                        Text("Save Changes", style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }

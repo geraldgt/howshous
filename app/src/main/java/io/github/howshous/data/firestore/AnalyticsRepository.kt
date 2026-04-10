@@ -167,9 +167,21 @@ class AnalyticsRepository {
 
         val seedUsers = listOf("seed_tenant_1", "seed_tenant_2", "seed_tenant_3")
         val seedSessions = listOf("seed_session_1", "seed_session_2", "seed_session_3", "seed_session_4")
+        val listingStats = mutableMapOf<String, Triple<Int?, Int?, Int?>>()
 
         for ((listingId, price) in listings) {
             if (listingId.isBlank()) continue
+
+            // Pull seeded listing stats when available to keep Performance in sync.
+            runCatching {
+                val snap = db.collection("listings").document(listingId).get().await()
+                if (snap.exists()) {
+                    val views = snap.getLong("uniqueViewCount")?.toInt()
+                    val saves = snap.getLong("savesCount")?.toInt()
+                    val messages = snap.getLong("messageCount")?.toInt()
+                    listingStats[listingId] = Triple(views, saves, messages)
+                }
+            }
 
             // 4 unique session views per listing (so views + uniqueSessions increment)
             for (i in seedSessions.indices) {
@@ -206,18 +218,21 @@ class AnalyticsRepository {
         val dailyStats = db.collection("listing_daily_stats")
         for ((listingId, _) in listings) {
             if (listingId.isBlank()) continue
+            val (seedViews, seedSaves, seedMessages) = listingStats[listingId] ?: Triple(null, null, null)
+            val views = seedViews?.takeIf { it > 0 } ?: 4
+            val saves = (seedSaves ?: 2).coerceAtMost(views)
+            val messages = (seedMessages ?: 1).coerceAtMost(views)
             val dayRef = dailyStats.document(listingId).collection("days").document(dateKey)
             val dayData = mapOf(
                 "listingId" to listingId,
                 "landlordId" to landlordId,
                 "date" to dateKey,
-                "views" to 4,
-                "uniqueSessions" to 4,
-                "saves" to 2,
-                "messages" to 1,
+                "views" to views,
+                "uniqueSessions" to views,
+                "saves" to saves,
+                "messages" to messages,
             )
             runCatching { dayRef.set(dayData, SetOptions.merge()).await() }
         }
     }
 }
-

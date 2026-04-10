@@ -52,6 +52,8 @@ import io.github.howshous.ui.theme.ReviewRed
 import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.viewmodels.ListingViewModel
 import io.github.howshous.ui.components.ReviewSummaryRow
+import io.github.howshous.ui.components.ReviewSummaryButton
+import io.github.howshous.ui.components.ReviewSubmissionSheet
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -82,6 +84,9 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
     var showReviewsSheet by remember { mutableStateOf(false) }
     var isReviewsLoading by remember { mutableStateOf(false) }
     var reviews by remember { mutableStateOf(emptyList<io.github.howshous.data.models.ListingReview>()) }
+    var showReviewSubmissionSheet by remember { mutableStateOf(false) }
+    var tenantReview by remember { mutableStateOf<io.github.howshous.data.models.ListingReview?>(null) }
+    var isReviewSubmitting by remember { mutableStateOf(false) }
     val adminRejectReasonOptions = remember {
         listOf(
             "Contract terms are missing or invalid",
@@ -134,6 +139,11 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
         if (listingId.isBlank()) return@LaunchedEffect
         isReviewsLoading = true
         reviews = reviewRepository.getReviewsForListing(listingId)
+        
+        // Load tenant's review if they are logged in
+        if (role == "tenant" && uid.isNotBlank()) {
+            tenantReview = reviewRepository.getTenantReviewForListing(listingId, uid)
+        }
         isReviewsLoading = false
     }
 
@@ -259,9 +269,9 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                     Text("₱${listing!!.price}/month", style = MaterialTheme.typography.titleMedium, color = PricePointGreen)
                     Text("Deposit: ₱${listing!!.deposit}", style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(8.dp))
-                    ReviewSummaryRow(
+                    ReviewSummaryButton(
                         summary = listing!!.reviewSummary,
-                        modifier = Modifier.clickable { showReviewsSheet = true }
+                        onClick = { showReviewsSheet = true }
                     )
                     Spacer(Modifier.height(12.dp))
                     if (role == "landlord") {
@@ -565,6 +575,26 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                 ReviewSummaryRow(summary = listing?.reviewSummary)
                 Spacer(Modifier.height(12.dp))
 
+                // Show review submission form for tenants
+                if (role == "tenant" && uid.isNotBlank() && listing != null) {
+                    Button(
+                        onClick = { showReviewSubmissionSheet = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF1B8D45),
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text(if (tenantReview != null) "Edit Your Review" else "Leave a Review")
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    
+                    if (tenantReview != null) {
+                        androidx.compose.material3.Divider()
+                        Spacer(Modifier.height(12.dp))
+                    }
+                }
+
                 when {
                     isReviewsLoading -> {
                         CircularProgressIndicator(
@@ -596,6 +626,89 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                 }
                 Spacer(Modifier.height(12.dp))
             }
+        }
+    }
+
+    if (showReviewSubmissionSheet && listing != null && uid.isNotBlank()) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showReviewSubmissionSheet = false },
+            sheetState = sheetState
+        ) {
+            ReviewSubmissionSheet(
+                existingReview = tenantReview,
+                onSubmit = { recommended, comment ->
+                    scope.launch {
+                        try {
+                            android.util.Log.d("ReviewSubmission", "Submitting review for listing: $listingId, reviewer: $uid")
+                            val review = io.github.howshous.data.models.ListingReview(
+                                listingId = listingId,
+                                reviewerId = uid,
+                                recommended = recommended,
+                                comment = comment.trim()
+                            )
+                            android.util.Log.d("ReviewSubmission", "Review object created: $review")
+                            val success = reviewRepository.addReview(listingId, review)
+                            android.util.Log.d("ReviewSubmission", "addReview returned: $success")
+                            if (success) {
+                                // Refresh reviews and reload listing to update summary
+                                reviews = reviewRepository.getReviewsForListing(listingId)
+                                tenantReview = reviewRepository.getTenantReviewForListing(listingId, uid)
+                                viewModel.loadListing(listingId)
+                                showReviewSubmissionSheet = false
+                            } else {
+                                android.util.Log.e("ReviewSubmission", "addReview returned false")
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("ReviewSubmission", "Error submitting review: ${e.message}", e)
+                            e.printStackTrace()
+                        }
+                    }
+                },
+                onUpdate = { recommended, comment ->
+                    scope.launch {
+                        try {
+                            if (tenantReview == null) return@launch
+                            val success = reviewRepository.updateReview(
+                                listingId,
+                                tenantReview!!.id,
+                                recommended,
+                                comment.trim()
+                            )
+                            if (success) {
+                                // Refresh reviews and reload listing to update summary
+                                reviews = reviewRepository.getReviewsForListing(listingId)
+                                tenantReview = reviewRepository.getTenantReviewForListing(listingId, uid)
+                                viewModel.loadListing(listingId)
+                                showReviewSubmissionSheet = false
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                },
+                onDelete = {
+                    scope.launch {
+                        try {
+                            if (tenantReview == null) return@launch
+                            val success = reviewRepository.deleteReview(listingId, tenantReview!!.id)
+                            if (success) {
+                                // Refresh reviews and reload listing to update summary
+                                reviews = reviewRepository.getReviewsForListing(listingId)
+                                tenantReview = null
+                                viewModel.loadListing(listingId)
+                                showReviewSubmissionSheet = false
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                },
+                onDismiss = {
+                    showReviewSubmissionSheet = false
+                },
+                isLoading = isReviewSubmitting
+            )
         }
     }
 

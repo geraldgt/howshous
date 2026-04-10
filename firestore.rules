@@ -58,6 +58,11 @@ service cloud.firestore {
       return changedKeys.hasOnly(["status", "updatedAt"]);
     }
 
+    function isReviewSummaryUpdate() {
+      let changedKeys = request.resource.data.diff(resource.data).changedKeys();
+      return changedKeys.hasOnly(["reviewSummary"]);
+    }
+
     // Raw analytics events: clients can write, but never read.
     match /events/{eventId} {
       allow create: if isSignedIn() && !isBanned();
@@ -83,6 +88,7 @@ service cloud.firestore {
       allow update: if isSignedIn() && !isBanned() && (
           isAdmin()
           || isUniqueViewIncrement()
+          || isReviewSummaryUpdate()
           || (
             isLandlordForListing(listingId)
             && (
@@ -124,7 +130,12 @@ service cloud.firestore {
               && request.resource.data.reviewerId.matches("^seed_tenant_[1-9][0-9]*$")
             )
           );
-        allow update, delete: if false;
+        allow update: if isSignedIn()
+          && !isBanned()
+          && request.auth.uid == resource.data.reviewerId;
+        allow delete: if isSignedIn()
+          && !isBanned()
+          && request.auth.uid == resource.data.reviewerId;
       }
     }
 

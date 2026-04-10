@@ -76,6 +76,17 @@ object SampleAccountSeeder {
 
             auth.signInWithEmailAndPassword(LANDLORD_EMAIL, LANDLORD_PASSWORD).await()
             SampleListingsGenerator.generateSampleListings(landlordUid, context)
+            runCatching {
+                val listingRepo = ListingRepository()
+                val analyticsRepo = AnalyticsRepository()
+                val listings = listingRepo.getListingsForLandlord(landlordUid)
+                if (listings.isNotEmpty()) {
+                    analyticsRepo.seedTestEventsForLandlord(
+                        landlordUid,
+                        listings.map { it.id to it.price }
+                    )
+                }
+            }
             auth.signOut()
 
             auth.signInWithEmailAndPassword(LANDLORD2_EMAIL, LANDLORD2_PASSWORD).await()
@@ -84,6 +95,17 @@ object SampleAccountSeeder {
                 context,
                 "Larry's"
             )
+            runCatching {
+                val listingRepo = ListingRepository()
+                val analyticsRepo = AnalyticsRepository()
+                val listings = listingRepo.getListingsForLandlord(landlord2Uid)
+                if (listings.isNotEmpty()) {
+                    analyticsRepo.seedTestEventsForLandlord(
+                        landlord2Uid,
+                        listings.map { it.id to it.price }
+                    )
+                }
+            }
             auth.signOut()
 
             ensureAccount(
@@ -91,25 +113,6 @@ object SampleAccountSeeder {
                 ADMIN_EMAIL,
                 ADMIN_PASSWORD
             ) { createAdminAccount(context) }
-
-            val listingRepo = ListingRepository()
-            val analyticsRepo = AnalyticsRepository()
-
-            val lemmListings = listingRepo.getListingsForLandlord(landlordUid)
-            if (lemmListings.isNotEmpty()) {
-                analyticsRepo.seedTestEventsForLandlord(
-                    landlordUid,
-                    lemmListings.map { it.id to it.price }
-                )
-            }
-
-            val larryListings = listingRepo.getListingsForLandlord(landlord2Uid)
-            if (larryListings.isNotEmpty()) {
-                analyticsRepo.seedTestEventsForLandlord(
-                    landlord2Uid,
-                    larryListings.map { it.id to it.price }
-                )
-            }
 
             auth.signOut()
 

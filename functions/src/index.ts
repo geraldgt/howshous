@@ -602,3 +602,104 @@ export const getListingAnalyticsSummary = functions.https.onCall(async (data, co
   // Returned as JSON-ready object suitable for AI analysis.
   return summary;
 });
+
+// ---------- User Ban Handler: Delete all reviews from banned user ----------
+
+export const onUserBanned = functions.firestore
+  .document("users/{userId}")
+  .onUpdate(async (change, context) => {
+    const userId = context.params.userId;
+    const oldData = change.before.data() as {isBanned?: boolean} | undefined;
+    const newData = change.after.data() as {isBanned?: boolean} | undefined;
+
+    const wasNotBanned = !oldData?.isBanned;
+    const isNowBanned = newData?.isBanned === true;
+
+    // Only proceed if user just got banned (isBanned: false -> true)
+    if (!wasNotBanned || !isNowBanned) {
+      console.log(`onUserBanned: Skipping for user ${userId} (wasNotBanned=${wasNotBanned}, isNowBanned=${isNowBanned})`);
+      return;
+    }
+
+    console.log(`onUserBanned: User ${userId} has been banned. Deleting their reviews...`);
+
+    try {
+      let deletedCount = 0;
+
+      // Find all reviews created by this banned user
+      const allListingsSnap = await db.collection("listings").get();
+      console.log(`onUserBanned: Found ${allListingsSnap.size} listings to check`);
+
+      for (const listingDoc of allListingsSnap.docs) {
+        const listingId = listingDoc.id;
+        
+        // Get all reviews for this listing by this user
+        const reviewsSnap = await db
+          .collection("listings")
+          .doc(listingId)
+          .collection("reviews")
+          .where("reviewerId", "==", userId)
+          .get();
+
+        console.log(`onUserBanned: Found ${reviewsSnap.size} reviews by user ${userId} in listing ${listingId}`);
+
+        // Delete each review and update the summary
+        for (const reviewDoc of reviewsSnap.docs) {
+          const reviewData = reviewDoc.data() as {
+            recommended?: boolean;
+          } | undefined;
+
+          if (reviewData !== undefined) {
+            try {
+              // Use transaction to atomically delete review and update listing summary
+              await db.runTransaction(async (transaction) => {
+                const listingRef = db.collection("listings").doc(listingId);
+                const reviewRef = listingRef.collection("reviews").doc(reviewDoc.id);
+
+                const listingSnap = await transaction.get(listingRef);
+                const summaryMap = listingSnap.get("reviewSummary") as {
+                  total?: number;
+                  recommendedCount?: number;
+                  notRecommendedCount?: number;
+                } | undefined;
+
+                const existingRecommended = summaryMap?.recommendedCount ?? 0;
+                const existingNotRecommended = summaryMap?.notRecommendedCount ?? 0;
+                const existingTotal = summaryMap?.total ?? 0;
+
+                const newRecommended = Math.max(
+                  existingRecommended - (reviewData.recommended ? 1 : 0),
+                  0
+                );
+                const newNotRecommended = Math.max(
+                  existingNotRecommended - (!reviewData.recommended ? 1 : 0),
+                  0
+                );
+                const newTotal = Math.max(existingTotal - 1, 0);
+
+                const updatedSummary = {
+                  total: newTotal,
+                  recommendedCount: newRecommended,
+                  notRecommendedCount: newNotRecommended,
+                  updatedAt: Timestamp.now(),
+                };
+
+                transaction.delete(reviewRef);
+                transaction.update(listingRef, {reviewSummary: updatedSummary});
+              });
+
+              deletedCount++;
+              console.log(`onUserBanned: Deleted review ${reviewDoc.id} from listing ${listingId}`);
+            } catch (txError) {
+              console.error(`onUserBanned: Error deleting review ${reviewDoc.id} from listing ${listingId}:`, txError);
+            }
+          }
+        }
+      }
+
+      console.log(`onUserBanned: Successfully processed ban for user ${userId}. Deleted ${deletedCount} reviews.`);
+    } catch (error) {
+      console.error(`onUserBanned: Error processing ban for user ${userId}:`, error);
+      throw error;
+    }
+  });
