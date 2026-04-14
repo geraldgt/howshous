@@ -99,7 +99,7 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
     }
 
     LaunchedEffect(listingId, uid) {
-        viewModel.loadListing(listingId)
+        viewModel.observeListing(listingId)
         if (uid.isNotBlank()) {
             viewModel.loadSavedState(listingId, uid)
         }

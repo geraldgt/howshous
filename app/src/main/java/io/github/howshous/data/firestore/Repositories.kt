@@ -464,6 +464,27 @@ class ListingRepository {
         }
     }
 
+    fun listenToListing(
+        id: String,
+        onUpdate: (Listing?) -> Unit
+    ): ListenerRegistration? {
+        if (id.isBlank()) return null
+        return db.collection("listings").document(id)
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    err.printStackTrace()
+                    onUpdate(null)
+                    return@addSnapshotListener
+                }
+                if (snap == null || !snap.exists()) {
+                    onUpdate(null)
+                    return@addSnapshotListener
+                }
+                val listing = snap.toObject(Listing::class.java)?.copy(id = snap.id)
+                onUpdate(listing)
+            }
+    }
+
     suspend fun createListing(listing: Listing): String {
         return try {
             val normalizedCapacity = listing.capacity.coerceAtLeast(1)

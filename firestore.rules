@@ -69,6 +69,22 @@ service cloud.firestore {
       return changedKeys.hasOnly(["currentOccupancy", "hasAvailableSlots", "genderPolicy"]);
     }
 
+    function isTenantOccupancyMetadataUpdate(listingId) {
+      let changedKeys = request.resource.data.diff(resource.data).changedKeys();
+      let tenancyId = listingId + "_" + request.auth.uid;
+      let tenancyDoc = get(/databases/$(database)/documents/tenancies/$(tenancyId));
+      let tenancyStatus = tenancyDoc.data.status is string ? tenancyDoc.data.status : "";
+      return changedKeys.hasOnly(["currentOccupancy", "hasAvailableSlots"])
+        && tenancyDoc.exists()
+        && tenancyDoc.data.listingId == listingId
+        && (tenancyStatus == "signed" || tenancyStatus == "confirmed" || tenancyStatus == "needs_resign" || tenancyStatus == "active");
+    }
+
+    function hasTenancyOnListing(listingId) {
+      return listingId != null
+        && exists(/databases/$(database)/documents/tenancies/$(listingId + "_" + request.auth.uid));
+    }
+
     // Raw analytics events: clients can write, but never read.
     match /events/{eventId} {
       allow create: if isSignedIn() && !isBanned();
@@ -99,6 +115,7 @@ service cloud.firestore {
           || isUniqueViewIncrement()
           || isReviewSummaryUpdate()
           || (isLandlordForListing(listingId) && isLandlordAvailabilityMetadataUpdate())
+          || isTenantOccupancyMetadataUpdate(listingId)
           || (
             isLandlordForListing(listingId)
             && (
@@ -243,8 +260,8 @@ service cloud.firestore {
       allow read: if isSignedIn()
         && !isBanned()
         && (
-          (resource.data.keys().hasAll(["tenantId", "landlordId"])
-            && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid))
+          resource.data.tenantId == request.auth.uid
+          || resource.data.landlordId == request.auth.uid
           || (
             resource.data.chatId != null
             && isChatParticipant(get(/databases/$(database)/documents/chats/$(resource.data.chatId)).data)
@@ -289,7 +306,12 @@ service cloud.firestore {
     match /tenancies/{tenancyId} {
       allow read: if isSignedIn()
         && !isBanned()
-        && (resource.data.tenantId == request.auth.uid || resource.data.landlordId == request.auth.uid);
+        && (
+          resource.data.tenantId == request.auth.uid
+          || resource.data.landlordId == request.auth.uid
+          || (resource.data.listingId != null && isLandlordForListing(resource.data.listingId))
+          || (resource.data.listingId != null && hasTenancyOnListing(resource.data.listingId))
+        );
       allow create, update: if isSignedIn()
         && !isBanned()
         && (request.resource.data.tenantId == request.auth.uid || request.resource.data.landlordId == request.auth.uid)

@@ -2,6 +2,7 @@ package io.github.howshous.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.firestore.ListenerRegistration
 import io.github.howshous.data.firestore.ListingRepository
 import io.github.howshous.data.firestore.AnalyticsRepository
 import io.github.howshous.data.firestore.SavedListingsRepository
@@ -157,6 +158,8 @@ class ListingViewModel : ViewModel() {
     // Tracks which listings have already been logged as viewed in this ViewModel's lifetime
     private val viewedInSession: MutableSet<String> = mutableSetOf()
 
+    private var listingListener: ListenerRegistration? = null
+
     private val _listing = MutableStateFlow<Listing?>(null)
     val listing: StateFlow<Listing?> = _listing
 
@@ -184,6 +187,26 @@ class ListingViewModel : ViewModel() {
                 _isLoading.value = false
             }
         }
+    }
+
+    fun observeListing(listingId: String) {
+        listingListener?.remove()
+        listingListener = null
+        if (listingId.isBlank()) {
+            _listing.value = null
+            return
+        }
+        _isLoading.value = true
+        listingListener = listingRepo.listenToListing(listingId) { listing ->
+            _listing.value = listing
+            _isLoading.value = false
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        listingListener?.remove()
+        listingListener = null
     }
 
     fun loadSavedState(listingId: String, userId: String) {
