@@ -151,6 +151,12 @@ fun TenantSearch(nav: NavController) {
     var sessionId by remember { mutableStateOf<String?>(null) }
     var showSearch by remember { mutableStateOf(true) }
 
+    LaunchedEffect(uid) {
+        if (uid.isNotBlank()) {
+            viewModel.loadAllListings(uid)
+        }
+    }
+
     LaunchedEffect(Unit) {
         sessionId = ensureSessionId(context)
     }
@@ -507,6 +513,13 @@ fun TenantAccount(nav: NavController) {
                     Spacer(Modifier.height(8.dp))
                     Text(profile!!.email, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
+                    if (profile!!.gender.isNotBlank()) {
+                        Text(
+                            "Gender: ${profile!!.gender.replaceFirstChar { it.uppercase() }}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
                     Text("Verified: ${if (profile!!.verified) "✓" else "✗"}", style = MaterialTheme.typography.bodySmall)
                 }
             }

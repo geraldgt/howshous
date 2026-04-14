@@ -35,14 +35,11 @@ class TenantSearchViewModel : ViewModel() {
     private val _selectedAmenities = MutableStateFlow<Set<String>>(emptySet())
     val selectedAmenities: StateFlow<Set<String>> = _selectedAmenities
 
-    init {
-        loadAllListings()
-    }
-
-    fun loadAllListings() {
+    fun loadAllListings(tenantId: String) {
+        if (tenantId.isBlank()) return
         viewModelScope.launch {
             _isLoading.value = true
-            val listings = listingRepo.getAllListings()
+            val listings = listingRepo.getAllListingsForTenant(tenantId)
             _allListings.value = listings
             applyFilters()
             _isLoading.value = false
@@ -81,7 +78,6 @@ class TenantSearchViewModel : ViewModel() {
     }
 
     private fun applyFilters() {
-        _isLoading.value = true
         val query = _searchQuery.value.trim()
         val minPrice = _minPriceInput.value.toIntOrNull()
         val maxPrice = _maxPriceInput.value.toIntOrNull()
@@ -99,7 +95,6 @@ class TenantSearchViewModel : ViewModel() {
         }
 
         _filteredListings.value = listings
-        _isLoading.value = false
     }
 
     fun logCurrentFilters(

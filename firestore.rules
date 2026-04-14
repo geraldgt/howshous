@@ -23,7 +23,8 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBanned == true;
     }
 
-    function isListingPublic(listingData) {
+    // Tenants browse/search: read active listings (gender + slot filtering is applied in the app).
+    function isListingReadableByTenant(listingData) {
       return listingData.status == "active";
     }
 
@@ -63,6 +64,11 @@ service cloud.firestore {
       return changedKeys.hasOnly(["reviewSummary"]);
     }
 
+    function isLandlordAvailabilityMetadataUpdate() {
+      let changedKeys = request.resource.data.diff(resource.data).changedKeys();
+      return changedKeys.hasOnly(["currentOccupancy", "hasAvailableSlots", "genderPolicy"]);
+    }
+
     // Raw analytics events: clients can write, but never read.
     match /events/{eventId} {
       allow create: if isSignedIn() && !isBanned();
@@ -78,17 +84,21 @@ service cloud.firestore {
     }
 
     match /listings/{listingId} {
-      allow read: if (isListingPublic(resource.data) && !isBanned())
-        || isAdmin()
-        || (isSignedIn() && !isBanned() && resource.data.landlordId == request.auth.uid);
+      allow read: if !isBanned() && (
+          isAdmin()
+          || (isSignedIn() && resource.data.landlordId == request.auth.uid)
+          || (isSignedIn() && isListingReadableByTenant(resource.data))
+        );
       allow create: if isSignedIn()
         && !isBanned()
         && request.resource.data.landlordId == request.auth.uid
-        && request.resource.data.status == "under_review";
+        && request.resource.data.status == "under_review"
+        && request.resource.data.genderPolicy in ["female", "male", "any"];
       allow update: if isSignedIn() && !isBanned() && (
           isAdmin()
           || isUniqueViewIncrement()
           || isReviewSummaryUpdate()
+          || (isLandlordForListing(listingId) && isLandlordAvailabilityMetadataUpdate())
           || (
             isLandlordForListing(listingId)
             && (
@@ -115,7 +125,7 @@ service cloud.firestore {
       }
 
       match /reviews/{reviewId} {
-        allow read: if (isListingPublic(get(/databases/$(database)/documents/listings/$(listingId)).data) && !isBanned())
+        allow read: if (isListingReadableByTenant(get(/databases/$(database)/documents/listings/$(listingId)).data) && !isBanned())
           || isAdmin()
           || isLandlordForListing(listingId)
           || (isSignedIn() && !isBanned() && request.auth.uid == resource.data.reviewerId);

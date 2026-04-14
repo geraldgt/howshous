@@ -7,6 +7,7 @@ import kotlinx.coroutines.tasks.await
 
 class ContractRepository {
     private val db = FirebaseFirestore.getInstance()
+    private val listingRepository = ListingRepository()
 
     suspend fun createContractFromListingTemplate(
         listingId: String,
@@ -144,6 +145,7 @@ class ContractRepository {
                     "updatedAt" to Timestamp.now()
                 )
                 db.collection("tenancies").document(tenancyId).set(tenancyData).await()
+                listingRepository.syncListingOccupancy(listingId)
             }
             true
         } catch (e: Exception) {

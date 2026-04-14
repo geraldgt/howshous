@@ -268,6 +268,12 @@ fun ListingDetailScreen(nav: NavController, listingId: String = "") {
                     Spacer(Modifier.height(8.dp))
                     Text("₱${listing!!.price}/month", style = MaterialTheme.typography.titleMedium, color = PricePointGreen)
                     Text("Deposit: ₱${listing!!.deposit}", style = MaterialTheme.typography.bodySmall)
+                    val maxOccupancy = listing!!.capacity.coerceAtLeast(1)
+                    val currentOccupancy = listing!!.currentOccupancy.coerceAtLeast(0).coerceAtMost(maxOccupancy)
+                    val remainingSlots = (maxOccupancy - currentOccupancy).coerceAtLeast(0)
+                    Text("Maximum occupancy: $maxOccupancy", style = MaterialTheme.typography.bodySmall)
+                    Text("Current occupancy: $currentOccupancy", style = MaterialTheme.typography.bodySmall)
+                    Text("Remaining slots: $remainingSlots", style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(8.dp))
                     ReviewSummaryButton(
                         summary = listing!!.reviewSummary,
