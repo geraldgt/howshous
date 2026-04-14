@@ -881,6 +881,7 @@ class NotificationRepository {
                 "title" to title,
                 "message" to message,
                 "read" to false,
+                "notified" to false,
                 "timestamp" to Timestamp.now(),
                 "actionUrl" to actionUrl
             )
@@ -906,6 +907,41 @@ class NotificationRepository {
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
+        }
+    }
+
+    fun listenNotificationsForUser(
+        userId: String,
+        limit: Long = 20,
+        onUpdate: (List<Notification>) -> Unit
+    ): ListenerRegistration? {
+        if (userId.isBlank()) return null
+        return db.collection("notifications")
+            .whereEqualTo("userId", userId)
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(limit)
+            .addSnapshotListener { snap, error ->
+                if (error != null || snap == null) {
+                    error?.printStackTrace()
+                    return@addSnapshotListener
+                }
+                val notifications = snap.documents.mapNotNull { doc ->
+                    doc.toObject(Notification::class.java)?.copy(id = doc.id)
+                }
+                onUpdate(notifications)
+            }
+    }
+
+    suspend fun markNotified(notificationId: String) {
+        try {
+            db.collection("notifications").document(notificationId).update(
+                mapOf(
+                    "notified" to true,
+                    "notifiedAt" to Timestamp.now()
+                )
+            ).await()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

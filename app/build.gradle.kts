@@ -90,6 +90,9 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    // Background polling for notifications (free plan alternative to Cloud Functions push)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
 }
 
 apply(plugin = "com.google.gms.google-services")

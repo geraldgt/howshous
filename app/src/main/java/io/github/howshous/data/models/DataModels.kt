@@ -104,6 +104,8 @@ data class Notification(
     val title: String = "",
     val message: String = "",
     val read: Boolean = false,
+    val notified: Boolean = false,
+    val notifiedAt: Timestamp? = null,
     val timestamp: Timestamp? = null,
     val actionUrl: String = "",
     val listingId: String = "",
