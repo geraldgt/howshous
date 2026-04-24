@@ -1,8 +1,13 @@
 package io.github.howshous
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -31,11 +36,28 @@ class MainActivity : ComponentActivity() {
         // Initialize Firebase FIRST
         FirebaseApp.initializeApp(this)
 
-        // Connect to emulators BEFORE any Firebase usage
-        val host = "10.0.2.2"
-        FirebaseAuth.getInstance().useEmulator(host, 9100)
-        FirebaseFirestore.getInstance().useEmulator(host, 8085)
-        FirebaseStorage.getInstance().useEmulator(host, 9190)
+        // Only use emulators in debug builds.
+        if (BuildConfig.USE_FIREBASE_EMULATORS) {
+            val host = "10.0.2.2"
+            FirebaseAuth.getInstance().useEmulator(host, 9100)
+            FirebaseFirestore.getInstance().useEmulator(host, 8085)
+            FirebaseStorage.getInstance().useEmulator(host, 9190)
+        }
+
+        // Android 13+ requires runtime permission to show notifications.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    1001
+                )
+            }
+        }
 
         // Free-plan "phone notifications": foreground listener + periodic background poll (15 min min).
         val notifRepo = NotificationRepository()
