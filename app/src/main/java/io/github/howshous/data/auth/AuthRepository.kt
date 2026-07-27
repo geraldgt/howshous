@@ -25,7 +25,7 @@ class AuthRepository(private val context: Context) {
 
     suspend fun signUpWithEmail(user: SimpleUser, password: String): Result<String> {
         return try {
-            if (user.role == "administrator" || user.role == "admin") {
+            if ((user.role == "administrator" || user.role == "admin") && !AdminConfig.isAllowedAdminEmail(user.email)) {
                 return Result.failure(IllegalArgumentException("Administrator accounts cannot be created in-app."))
             }
             val res = auth.createUserWithEmailAndPassword(user.email!!, password).await()
@@ -66,10 +66,33 @@ class AuthRepository(private val context: Context) {
         return try {
             val res = auth.signInWithEmailAndPassword(email, password).await()
             val uid = res.user!!.uid
-            // load user role from Firestore
+            val authEmail = res.user?.email?.trim().orEmpty()
             val doc = db.collection("users").document(uid).get().await()
-            val role = doc.getString("role") ?: ""
-            val isBanned = doc.getBoolean("isBanned") ?: false
+            if (!doc.exists() && AdminConfig.isAllowedAdminEmail(authEmail)) {
+                val displayName = res.user?.displayName?.trim().orEmpty()
+                val nameParts = displayName.split(" ").filter { it.isNotBlank() }
+                val firstName = nameParts.firstOrNull() ?: "Admin"
+                val lastName = nameParts.drop(1).joinToString(" ").ifBlank { "User" }
+                val userMap = mapOf(
+                    "uid" to uid,
+                    "firstName" to firstName,
+                    "lastName" to lastName,
+                    "email" to authEmail,
+                    "phone" to "",
+                    "role" to "administrator",
+                    "isBanned" to false,
+                    "bannedAt" to null,
+                    "bannedBy" to "",
+                    "banReason" to "",
+                    "profileImageUrl" to "",
+                    "verified" to true,
+                    "createdAt" to Timestamp.now()
+                )
+                db.collection("users").document(uid).set(userMap).await()
+            }
+            val profileDoc = if (doc.exists()) doc else db.collection("users").document(uid).get().await()
+            val role = profileDoc.getString("role") ?: ""
+            val isBanned = profileDoc.getBoolean("isBanned") ?: false
             if (isBanned) {
                 saveRole(context, "banned")
                 saveUid(context, uid)

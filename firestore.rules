@@ -28,12 +28,31 @@ service cloud.firestore {
       return listingData.status == "active";
     }
 
-    function isSampleAdminBootstrap() {
+    function hasAdminCustomClaim() {
+      return request.auth.token.keys().hasAll(['admin']) && request.auth.token.admin == true;
+    }
+
+    // App managers: create their own users/{uid} profile with role administrator.
+    // Keep this email list in sync with AdminConfig.kt in the Android app.
+    function isAllowedAdministratorProfileCreate() {
       return request.resource.data.keys().hasAll(["role", "email", "firstName", "lastName"])
         && request.resource.data.role == "administrator"
-        && request.resource.data.email == "aa@hh.com"
-        && request.resource.data.firstName == "Annie"
-        && request.resource.data.lastName == "Admin";
+        && request.auth.token.keys().hasAll(["email"])
+        && request.auth.token.email == request.resource.data.email
+        && request.auth.token.email in [
+          "aa@hh.com"
+        ];
+    }
+
+    function isValidUserRoleOnCreate() {
+      return request.resource.data.keys().hasAny(["role"])
+        && (
+          request.resource.data.role in ["tenant", "landlord"]
+          || (
+            request.resource.data.role == "administrator"
+            && (hasAdminCustomClaim() || isAllowedAdministratorProfileCreate())
+          )
+        );
     }
 
     function isLandlordForListing(listingId) {
@@ -149,14 +168,7 @@ service cloud.firestore {
         allow create: if isSignedIn()
           && !isBanned()
           && request.resource.data.listingId == listingId
-          && (
-            request.auth.uid == request.resource.data.reviewerId
-            || (
-              isLandlordForListing(listingId)
-              && get(/databases/$(database)/documents/listings/$(listingId)).data.isSample == true
-              && request.resource.data.reviewerId.matches("^seed_tenant_[1-9][0-9]*$")
-            )
-          );
+          && request.auth.uid == request.resource.data.reviewerId;
         allow update: if isSignedIn()
           && !isBanned()
           && request.auth.uid == resource.data.reviewerId;
@@ -173,10 +185,7 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && !isBanned()
         && request.auth.uid == userId
-        && (
-          (request.resource.data.keys().hasAny(["role"]) && request.resource.data.role in ["tenant", "landlord"])
-          || isSampleAdminBootstrap()
-        );
+        && isValidUserRoleOnCreate();
       allow update: if isAdmin() || (
           isSignedIn()
           && !isBanned()

@@ -3,7 +3,6 @@ package io.github.howshous.notifications
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import io.github.howshous.data.firestore.NotificationRepository
 import io.github.howshous.data.models.Notification
@@ -22,26 +21,26 @@ class NotificationSyncWorker(
         if (uid.isBlank()) return Result.success()
 
         val lastMs = readLastNotifiedAtMs(applicationContext)
-        val lastTs = Timestamp(lastMs / 1000, ((lastMs % 1000) * 1_000_000).toInt())
         val notifRepo = NotificationRepository()
 
         return try {
             val snap = FirebaseFirestore.getInstance()
                 .collection("notifications")
                 .whereEqualTo("userId", uid)
-                .whereGreaterThan("timestamp", lastTs)
-                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
-                .limit(10)
                 .get()
                 .await()
 
             var maxSeenMs = lastMs
-            snap.documents.forEach { doc ->
-                val notif = doc.toObject(Notification::class.java)?.copy(id = doc.id) ?: return@forEach
+            val notifications = snap.documents.mapNotNull { doc ->
+                doc.toObject(Notification::class.java)?.copy(id = doc.id)
+            }.sortedBy { it.timestamp?.seconds ?: 0L }
+
+            notifications.forEach { notif ->
+                val ms = (notif.timestamp?.seconds ?: 0L) * 1000L
+                if (ms < lastMs) return@forEach
                 if (notif.read || notif.notified) return@forEach
                 LocalNotificationHelper.show(applicationContext, notif)
                 notifRepo.markNotified(notif.id)
-                val ms = (notif.timestamp?.seconds ?: 0L) * 1000L
                 if (ms >= maxSeenMs) maxSeenMs = ms + 1
             }
 

@@ -202,37 +202,5 @@ object GeminiApiClient {
             parts.optJSONObject(0)?.optString("text")
         }.getOrNull()
     }
-
-    // Helper function to list available models (for debugging)
-    suspend fun listAvailableModels(): Result<String> = withContext(Dispatchers.IO) {
-        val key = GeminiKeyProvider.getKey()
-            ?: return@withContext Result.failure(IllegalStateException("Gemini API key is not configured."))
-
-        val endpoints = listOf(
-            "https://generativelanguage.googleapis.com/v1/models?key=$key",
-            "https://generativelanguage.googleapis.com/v1beta/models?key=$key"
-        )
-
-        for (endpoint in endpoints) {
-            val result = runCatching {
-                val request = Request.Builder()
-                    .url(endpoint)
-                    .get()
-                    .build()
-
-                httpClient.newCall(request).execute().use { response ->
-                    val body = response.body?.string().orEmpty()
-                    if (response.isSuccessful) {
-                        body
-                    } else {
-                        null
-                    }
-                }
-            }
-            result.getOrNull()?.let { return@withContext Result.success(it) }
-        }
-
-        Result.failure(Exception("Could not list models from any endpoint"))
-    }
 }
 

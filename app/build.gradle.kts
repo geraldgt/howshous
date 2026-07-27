@@ -30,20 +30,20 @@ android {
         val geminiApiKey = localProps.getProperty("GEMINI_API_KEY") ?: ""
         val openaiApiKey = localProps.getProperty("OPENAI_API_KEY") ?: ""
         val groqApiKey = localProps.getProperty("GROQ_API_KEY") ?: ""
+        val cloudinaryCloudName = localProps.getProperty("CLOUDINARY_CLOUD_NAME") ?: ""
+        val cloudinaryUploadPreset = localProps.getProperty("CLOUDINARY_UPLOAD_PRESET") ?: ""
+        val useFirebaseEmulators = localProps.getProperty("FIREBASE_USE_EMULATORS")?.toBooleanStrictOrNull() ?: false
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
         buildConfigField("String", "OPENAI_API_KEY", "\"$openaiApiKey\"")
         buildConfigField("String", "GROQ_API_KEY", "\"$groqApiKey\"")
-
-        // Production-safe default: do NOT use Firebase emulators on phones.
-        buildConfigField("Boolean", "USE_FIREBASE_EMULATORS", "false")
+        buildConfigField("String", "CLOUDINARY_CLOUD_NAME", "\"$cloudinaryCloudName\"")
+        buildConfigField("String", "CLOUDINARY_UPLOAD_PRESET", "\"$cloudinaryUploadPreset\"")
+        // Emulator usage is opt-in via local.properties: FIREBASE_USE_EMULATORS=true
+        buildConfigField("Boolean", "USE_FIREBASE_EMULATORS", useFirebaseEmulators.toString())
     }
 
     buildTypes {
-        debug {
-            buildConfigField("Boolean", "USE_FIREBASE_EMULATORS", "true")
-        }
         release {
-            buildConfigField("Boolean", "USE_FIREBASE_EMULATORS", "false")
             isMinifyEnabled = false
         }
     }

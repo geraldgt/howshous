@@ -14,7 +14,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.github.howshous.data.auth.AuthRepository
-import io.github.howshous.data.firestore.NotificationRepository
 import io.github.howshous.ui.components.DebouncedIconButton
 import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.data.readPhoneNotifsEnabledFlow
@@ -31,8 +30,6 @@ fun SettingsScreen(nav: NavController) {
     val phoneNotifsEnabled by readPhoneNotifsEnabledFlow(context).collectAsState(initial = true)
     val viewModel: AccountViewModel = viewModel()
     val profile by viewModel.userProfile.collectAsState()
-    val notificationRepository = remember { NotificationRepository() }
-    var testSending by remember { mutableStateOf(false) }
 
     LaunchedEffect(uid) {
         if (uid.isNotEmpty()) viewModel.loadUserProfile(uid)
@@ -89,7 +86,7 @@ fun SettingsScreen(nav: NavController) {
                             Text("Phone notifications", style = MaterialTheme.typography.bodyMedium)
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                "Checks every ~15 minutes in background (free plan).",
+                                "Receive alerts on this device while using the app and in the background.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -100,30 +97,6 @@ fun SettingsScreen(nav: NavController) {
                                 scope.launch { setPhoneNotifsEnabled(context, enabled) }
                             }
                         )
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            if (uid.isBlank() || testSending) return@Button
-                            testSending = true
-                            scope.launch {
-                                try {
-                                    notificationRepository.createNotification(
-                                        userId = uid,
-                                        type = "system",
-                                        title = "Test Notification",
-                                        message = "If you can read this, phone notifications are working.",
-                                        actionUrl = "settings"
-                                    )
-                                } finally {
-                                    testSending = false
-                                }
-                            }
-                        },
-                        enabled = uid.isNotBlank() && !testSending,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(if (testSending) "Sending..." else "Send Test Notification")
                     }
                 }
             }

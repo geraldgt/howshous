@@ -918,13 +918,13 @@ class NotificationRepository {
         return try {
             val snap = db.collection("notifications")
                 .whereEqualTo("userId", userId)
-                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                .limit(limit)
                 .get()
                 .await()
             snap.documents.mapNotNull { doc ->
                 doc.toObject(Notification::class.java)?.copy(id = doc.id)
             }
+                .sortedByDescending { it.timestamp?.seconds ?: 0L }
+                .take(limit.toInt().coerceAtLeast(0))
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
@@ -939,8 +939,6 @@ class NotificationRepository {
         if (userId.isBlank()) return null
         return db.collection("notifications")
             .whereEqualTo("userId", userId)
-            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-            .limit(limit)
             .addSnapshotListener { snap, error ->
                 if (error != null || snap == null) {
                     error?.printStackTrace()
@@ -949,6 +947,8 @@ class NotificationRepository {
                 val notifications = snap.documents.mapNotNull { doc ->
                     doc.toObject(Notification::class.java)?.copy(id = doc.id)
                 }
+                    .sortedByDescending { it.timestamp?.seconds ?: 0L }
+                    .take(limit.toInt().coerceAtLeast(0))
                 onUpdate(notifications)
             }
     }
