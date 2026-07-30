@@ -33,6 +33,7 @@ import io.github.howshous.ui.screens.LandlordProfileScreen
 import io.github.howshous.ui.screens.ListingDetailScreen
 import io.github.howshous.ui.screens.main_tenant.TenantAIHelperScreen
 import io.github.howshous.ui.screens.main_tenant.ViewContractsScreen
+import io.github.howshous.ui.screens.main_tenant.SavedListingsScreen
 import io.github.howshous.ui.screens.main_tenant.EmergencyScreen
 import io.github.howshous.ui.screens.main_tenant.ReportIssueScreen
 import io.github.howshous.ui.screens.main_landlord.LandlordAnalyticsAIChatScreen
@@ -117,6 +118,10 @@ fun HowsHousApp(nav: NavHostController = rememberNavController()) {
 
         composable("view_contracts") {
             ViewContractsScreen(nav)
+        }
+
+        composable("saved_listings") {
+            SavedListingsScreen(nav)
         }
 
         composable("emergency") {

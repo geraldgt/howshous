@@ -2,6 +2,7 @@ package io.github.howshous.data.firestore
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import io.github.howshous.data.models.Listing
 import kotlinx.coroutines.tasks.await
 
 class SavedListingsRepository {
@@ -42,6 +43,30 @@ class SavedListingsRepository {
         if (userId.isBlank() || listingId.isBlank()) return
         runCatching {
             userSavesCollection(userId).document(listingId).delete().await()
+        }
+    }
+
+    suspend fun getSavedListingIds(userId: String): List<String> {
+        if (userId.isBlank()) return emptyList()
+        return try {
+            userSavesCollection(userId)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { doc ->
+                    doc.getString("listingId") ?: doc.id.takeIf { it.isNotBlank() }
+                }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    suspend fun getSavedListings(userId: String, listingRepository: ListingRepository): List<Listing> {
+        val ids = getSavedListingIds(userId)
+        if (ids.isEmpty()) return emptyList()
+        return ids.mapNotNull { listingId ->
+            listingRepository.getListing(listingId)
         }
     }
 }

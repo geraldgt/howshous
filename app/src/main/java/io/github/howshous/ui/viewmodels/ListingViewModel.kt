@@ -71,6 +71,11 @@ class TenantSearchViewModel : ViewModel() {
         applyFilters()
     }
 
+    fun setSelectedAmenities(amenities: Set<String>) {
+        _selectedAmenities.value = amenities
+        applyFilters()
+    }
+
     fun clearFilters() {
         _minPriceInput.value = ""
         _maxPriceInput.value = ""

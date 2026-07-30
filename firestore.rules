@@ -55,6 +55,12 @@ service cloud.firestore {
         );
     }
 
+    function isLandlordUser() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "landlord";
+    }
+
     function isLandlordForListing(listingId) {
       return isSignedIn()
         && get(/databases/$(database)/documents/listings/$(listingId)).data.landlordId == request.auth.uid;
@@ -350,6 +356,19 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).changedKeys()
           .hasOnly(["status", "reviewedAt", "reviewedBy", "reviewNotes"]);
       allow delete: if false;
+    }
+
+    match /amenity_tags/{tagId} {
+      allow read: if isSignedIn() && !isBanned();
+      allow create: if isSignedIn()
+        && !isBanned()
+        && (isLandlordUser() || isAdmin())
+        && request.resource.data.keys().hasOnly(["label", "createdBy", "createdAt"])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.label is string
+        && request.resource.data.label.size() >= 2
+        && request.resource.data.label.size() <= 40;
+      allow update, delete: if isAdmin();
     }
   }
 }

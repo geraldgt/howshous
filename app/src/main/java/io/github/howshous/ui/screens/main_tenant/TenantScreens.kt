@@ -32,6 +32,7 @@ import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.data.ensureSessionId
 import io.github.howshous.ui.theme.AlertOrange
 import io.github.howshous.ui.theme.ContractsBlue
+import io.github.howshous.ui.theme.TenantGreen
 import io.github.howshous.ui.theme.SuccessSurface
 import io.github.howshous.ui.theme.SurfaceLight
 import io.github.howshous.ui.viewmodels.HomeViewModel
@@ -43,7 +44,7 @@ import kotlinx.coroutines.launch
 import io.github.howshous.ui.components.SearchBar
 import io.github.howshous.ui.components.NoListingsEmptyState
 import io.github.howshous.ui.components.ListingCard
-import io.github.howshous.ui.components.FilterChip as AmenityFilterChip
+import io.github.howshous.ui.components.AmenitySelector
 
 @Composable
 fun TenantHome(nav: NavController) {
@@ -102,6 +103,16 @@ fun TenantHome(nav: NavController) {
                 )
             ) {
                 Text("View Contracts", style = MaterialTheme.typography.labelSmall)
+            }
+
+            Button(
+                onClick = { nav.navigate("saved_listings") },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = TenantGreen
+                )
+            ) {
+                Text("Saved Listings", style = MaterialTheme.typography.labelSmall)
             }
 
             // Report Issue Button (only if has contract)
@@ -178,12 +189,6 @@ fun TenantSearch(nav: NavController) {
     LaunchedEffect(Unit) {
         sessionId = ensureSessionId(context)
     }
-
-    val availableAmenities = listOf(
-        "Free Parking", "WiFi", "Air Conditioning", "Pets Allowed",
-        "Kitchen Access", "Laundry", "Security", "CCTV", "Furnished",
-        "Near Public Transport", "Gym Access", "Swimming Pool"
-    )
 
     val hasActiveFilters = minPriceInput.isNotBlank() ||
         maxPriceInput.isNotBlank() ||
@@ -285,26 +290,19 @@ fun TenantSearch(nav: NavController) {
             Spacer(Modifier.height(12.dp))
             Text("Amenities", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                items(availableAmenities) { amenity ->
-                    AmenityFilterChip(
-                        label = amenity,
-                        selected = selectedAmenities.contains(amenity),
-                        onSelectedChange = {
-                            viewModel.toggleAmenity(amenity)
-                            scope.launch {
-                                viewModel.logCurrentFilters(
-                                    userId = uid,
-                                    sessionId = sessionId
-                                )
-                            }
-                        }
-                    )
-                }
-            }
+            AmenitySelector(
+                selectedAmenities = selectedAmenities,
+                onSelectionChange = { updated ->
+                    viewModel.setSelectedAmenities(updated)
+                    scope.launch {
+                        viewModel.logCurrentFilters(
+                            userId = uid,
+                            sessionId = sessionId
+                        )
+                    }
+                },
+                allowCustomAmenities = false
+            )
 
             Spacer(Modifier.height(16.dp))
         }

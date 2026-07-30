@@ -70,6 +70,7 @@ import coil.compose.AsyncImage
 import com.google.firebase.firestore.FieldValue
 import io.github.howshous.data.firestore.ListingRepository
 import io.github.howshous.data.models.Listing
+import io.github.howshous.ui.components.AmenitySelector
 import io.github.howshous.ui.components.DebouncedIconButton
 import io.github.howshous.ui.data.readUidFlow
 import io.github.howshous.ui.theme.InputShape
@@ -148,11 +149,6 @@ fun EditListingScreen(nav: NavController, listingId: String = "") {
         "Rizal Monument"
     )
 
-    val availableAmenities = listOf(
-        "Free Parking", "WiFi", "Air Conditioning", "Pets Allowed",
-        "Kitchen Access", "Laundry", "Security", "CCTV", "Furnished",
-        "Near Public Transport", "Gym Access", "Swimming Pool"
-    )
 
     LaunchedEffect(listingId) {
         if (listingId.isBlank()) return@LaunchedEffect
@@ -488,34 +484,17 @@ fun EditListingScreen(nav: NavController, listingId: String = "") {
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            items(availableAmenities) { amenity ->
-                                FilterChip(
-                                    selected = selectedAmenities.contains(amenity),
-                                    onClick = {
-                                        selectedAmenities = if (selectedAmenities.contains(amenity)) {
-                                            selectedAmenities - amenity
-                                        } else {
-                                            selectedAmenities + amenity
-                                        }
-                                    },
-                                    label = { Text(amenity, style = MaterialTheme.typography.labelSmall) }
-                                )
-                            }
-                        }
+                AmenitySelector(
+                    selectedAmenities = selectedAmenities,
+                    onSelectionChange = { selectedAmenities = it },
+                    allowCustomAmenities = true,
+                    userId = uid,
+                    selectedContainerColor = landlordAccent,
+                    selectedLabelColor = landlordAccentOn,
+                    onError = { message ->
+                        scope.launch { snackbarHostState.showSnackbar(message) }
                     }
-                }
+                )
 
                 Spacer(Modifier.height(20.dp))
 
