@@ -7,16 +7,12 @@ import io.github.howshous.data.models.SearchFilterKey
 import kotlinx.coroutines.tasks.await
 
 /**
- * Centralized analytics event logger used by the client.
- *
- * Responsibilities:
- * - Validate and normalize event types using AnalyticsEventType
- * - Attach session_id (when provided)
- * - Attach a server timestamp
- * - Write to the Firestore `analytics_events` collection
+ * Logs analytics events and aggregates listing_daily_stats on the client
+ * (Spark plan — Cloud Functions are not used).
  */
 class AnalyticsRepository {
     private val db = FirebaseFirestore.getInstance()
+    private val dailyStatsRepo = ListingDailyStatsRepository()
 
     private fun eventsCollection() = db.collection("events")
 
@@ -66,6 +62,10 @@ class AnalyticsRepository {
                 "price" to price,
             ),
         )
+
+        if (!sessionId.isNullOrBlank()) {
+            dailyStatsRepo.recordView(listingId, landlordId, sessionId)
+        }
     }
 
     suspend fun logSearchFilters(
@@ -91,9 +91,7 @@ class AnalyticsRepository {
             userId = userId.ifBlank { null },
             sessionId = sessionId,
             payload = mapOf(
-                // filter keys (no free-text query)
                 "filterKeys" to activeFilterKeys,
-                // numeric context for analysis
                 "minPrice" to (minPrice ?: 0),
                 "maxPrice" to (maxPrice ?: 0),
                 "amenities" to amenities.toList(),
@@ -119,6 +117,8 @@ class AnalyticsRepository {
                 "landlordId" to landlordId,
             ),
         )
+
+        dailyStatsRepo.recordMessage(listingId, landlordId, chatId)
     }
 
     suspend fun logListingSave(
@@ -140,5 +140,27 @@ class AnalyticsRepository {
                 "price" to price,
             ),
         )
+
+        dailyStatsRepo.recordSave(listingId, landlordId, userId)
+    }
+
+    /** Sync analytics for a listing the user already saved before aggregation existed. */
+    suspend fun syncExistingSave(
+        listingId: String,
+        landlordId: String,
+        userId: String,
+    ) {
+        if (listingId.isBlank() || landlordId.isBlank() || userId.isBlank()) return
+        dailyStatsRepo.recordSave(listingId, landlordId, userId)
+    }
+
+    /** Sync analytics for a chat that already had messages before aggregation existed. */
+    suspend fun syncExistingMessage(
+        chatId: String,
+        listingId: String,
+        landlordId: String,
+    ) {
+        if (chatId.isBlank() || listingId.isBlank() || landlordId.isBlank()) return
+        dailyStatsRepo.recordMessage(listingId, landlordId, chatId)
     }
 }

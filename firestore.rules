@@ -116,11 +116,48 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
-    // Daily listing stats: landlords can read and write their own stats (e.g. seed data when using emulator without Functions).
+    // Daily listing stats: written by clients (Spark plan); read by listing landlord.
     match /listing_daily_stats/{listingId} {
       match /days/{date} {
-        allow read, create, update: if isLandlordForListing(listingId) && !isBanned();
-        allow delete: if false;
+        allow read: if isLandlordForListing(listingId) && !isBanned();
+        allow create, update: if isSignedIn() && !isBanned();
+        allow delete: if isAdmin();
+
+        match /sessions/{sessionId} {
+          // Tenants read session docs inside aggregation transactions (dedupe check).
+          allow read: if isSignedIn() && !isBanned();
+          allow create: if isSignedIn() && !isBanned();
+          allow update, delete: if false;
+        }
+      }
+    }
+
+    // Dedupe markers for client-side analytics aggregation.
+    match /listing_metrics/{listingId} {
+      allow read: if isLandlordForListing(listingId) && !isBanned();
+      allow create, update: if isSignedIn() && !isBanned();
+
+      match /sessions/{sessionId} {
+        allow read: if isSignedIn() && !isBanned();
+        allow create: if isSignedIn() && !isBanned();
+        allow update, delete: if false;
+      }
+
+      match /saves/{userId} {
+        allow read: if isLandlordForListing(listingId)
+          || (isSignedIn() && !isBanned() && request.auth.uid == userId);
+        // Tenants record their own saves; landlords backfill pre-analytics saved_listings.
+        allow create: if isSignedIn() && !isBanned() && (
+          request.auth.uid == userId
+          || isLandlordForListing(listingId)
+        );
+        allow update, delete: if false;
+      }
+
+      match /chats/{chatId} {
+        allow read: if isSignedIn() && !isBanned();
+        allow create: if isSignedIn() && !isBanned();
+        allow update, delete: if false;
       }
     }
 
@@ -201,7 +238,11 @@ service cloud.firestore {
       allow delete: if false;
 
       match /saved_listings/{listingId} {
-        allow read, write: if isSignedIn() && !isBanned() && request.auth.uid == userId;
+        allow read: if isSignedIn() && !isBanned() && (
+          request.auth.uid == userId
+          || isLandlordForListing(listingId)
+        );
+        allow write: if isSignedIn() && !isBanned() && request.auth.uid == userId;
       }
     }
 

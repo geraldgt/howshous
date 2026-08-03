@@ -189,7 +189,7 @@ fun LandlordListings(nav: NavController) {
         if (selectedTab == 1 && listings.isNotEmpty()) {
             metricsLoading = true
             metricsMap = withContext(Dispatchers.IO) {
-                metricsRepo.getMetricsForListings(listings.map { it.id })
+                metricsRepo.getMetricsForLandlordListings(listings)
             }
             metricsLoading = false
         } else if (listings.isEmpty()) {

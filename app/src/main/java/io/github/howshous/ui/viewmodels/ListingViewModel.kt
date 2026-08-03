@@ -205,8 +205,11 @@ class ListingViewModel : ViewModel() {
         listingListener = listingRepo.listenToListing(listingId) { listing ->
             _listing.value = listing
             _isLoading.value = false
+            trySyncSaveAnalytics()
         }
     }
+
+    private var pendingSaveSync: Pair<String, String>? = null
 
     override fun onCleared() {
         super.onCleared()
@@ -217,8 +220,39 @@ class ListingViewModel : ViewModel() {
     fun loadSavedState(listingId: String, userId: String) {
         if (listingId.isBlank() || userId.isBlank()) return
         viewModelScope.launch {
-            _isSaved.value = savedRepo.isListingSaved(userId, listingId)
+            val saved = savedRepo.isListingSaved(userId, listingId)
+            _isSaved.value = saved
+            if (saved) {
+                pendingSaveSync = listingId to userId
+                trySyncSaveAnalytics()
+            }
         }
+    }
+
+    private val syncedSaveAnalytics = mutableSetOf<String>()
+
+    private fun trySyncSaveAnalytics() {
+        val pending = pendingSaveSync ?: return
+        val (listingId, userId) = pending
+        if (syncedSaveAnalytics.contains(listingId)) return
+        val current = _listing.value ?: return
+        if (current.id != listingId) return
+
+        syncedSaveAnalytics.add(listingId)
+        pendingSaveSync = null
+        viewModelScope.launch {
+            analyticsRepo.syncExistingSave(
+                listingId = listingId,
+                landlordId = current.landlordId,
+                userId = userId,
+            )
+        }
+    }
+
+    fun syncSaveAnalyticsIfNeeded(listingId: String, userId: String) {
+        if (listingId.isBlank() || userId.isBlank()) return
+        pendingSaveSync = listingId to userId
+        trySyncSaveAnalytics()
     }
 
     fun toggleSave(

@@ -1,6 +1,7 @@
 package io.github.howshous.data.firestore
 
 import com.google.firebase.firestore.FirebaseFirestore
+import io.github.howshous.data.models.Listing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -21,15 +22,7 @@ data class ListingMetrics(
 
 class ListingMetricsRepository {
     private val db = FirebaseFirestore.getInstance()
-
-    private fun dateKeyDaysAgo(daysAgo: Int): String {
-        val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
-        cal.add(java.util.Calendar.DAY_OF_MONTH, -daysAgo)
-        val y = cal.get(java.util.Calendar.YEAR)
-        val m = cal.get(java.util.Calendar.MONTH) + 1
-        val d = cal.get(java.util.Calendar.DAY_OF_MONTH)
-        return "%04d-%02d-%02d".format(y, m, d)
-    }
+    private val dailyStatsRepo = ListingDailyStatsRepository()
 
     private fun isWithinLastNDays(dateStr: String, days: Int): Boolean {
         val parts = dateStr.split("-")
@@ -46,11 +39,9 @@ class ListingMetricsRepository {
     suspend fun getMetricsForListing(listingId: String): ListingMetrics? {
         if (listingId.isBlank()) return null
         return try {
-            val thirtyDaysAgo = dateKeyDaysAgo(30)
             val snap = db.collection("listing_daily_stats")
                 .document(listingId)
                 .collection("days")
-                .whereGreaterThanOrEqualTo("date", thirtyDaysAgo)
                 .get()
                 .await()
 
@@ -64,7 +55,7 @@ class ListingMetricsRepository {
             var messages30d = 0
 
             for (doc in snap.documents) {
-                val date = doc.getString("date") ?: continue
+                val date = doc.getString("date") ?: doc.id
                 val views = (doc.get("views") as? Number)?.toInt() ?: 0
                 val uniqueSessions = (doc.get("uniqueSessions") as? Number)?.toInt() ?: 0
                 val saves = (doc.get("saves") as? Number)?.toInt() ?: 0
@@ -101,11 +92,33 @@ class ListingMetricsRepository {
         }
     }
 
-    suspend fun getMetricsForListings(listingIds: List<String>): Map<String, ListingMetrics> {
-        if (listingIds.isEmpty()) return emptyMap()
+    suspend fun getMetricsForLandlordListings(listings: List<Listing>): Map<String, ListingMetrics> {
+        if (listings.isEmpty()) return emptyMap()
+        for (listing in listings) {
+            dailyStatsRepo.backfillViewsIfMissing(
+                listingId = listing.id,
+                landlordId = listing.landlordId,
+                uniqueViewCount = listing.uniqueViewCount,
+            )
+            dailyStatsRepo.backfillSavesFromExisting(listing.id, listing.landlordId)
+            dailyStatsRepo.backfillMessagesFromExistingChats(listing.id, listing.landlordId)
+        }
         return coroutineScope {
-            val jobs = listingIds.map { id ->
-                async(Dispatchers.IO) { id to getMetricsForListing(id) }
+            val jobs = listings.map { listing ->
+                async(Dispatchers.IO) {
+                    val metrics = getMetricsForListing(listing.id)
+                        ?: return@async listing.id to null
+                    if (metrics.views30d == 0 && listing.uniqueViewCount > 0) {
+                        listing.id to metrics.copy(
+                            views7d = listing.uniqueViewCount,
+                            views30d = listing.uniqueViewCount,
+                            uniqueSessions7d = listing.uniqueViewCount,
+                            uniqueSessions30d = listing.uniqueViewCount,
+                        )
+                    } else {
+                        listing.id to metrics
+                    }
+                }
             }
             jobs.awaitAll()
                 .mapNotNull { (id, metrics) -> metrics?.let { id to it } }

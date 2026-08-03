@@ -48,7 +48,7 @@ class LandlordAnalyticsAIViewModel : ViewModel() {
     private suspend fun buildLandlordContextJson(): String {
         if (currentUserId.isBlank()) return "{}"
         val listings = listingRepository.getListingsForLandlord(currentUserId)
-        val metrics = metricsRepository.getMetricsForListings(listings.map { it.id })
+        val metrics = metricsRepository.getMetricsForLandlordListings(listings)
         val totalViews = metrics.values.sumOf { it.views30d }
         val totalSaves = metrics.values.sumOf { it.saves30d }
         val totalMessages = metrics.values.sumOf { it.messages30d }

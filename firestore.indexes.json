@@ -25,6 +25,14 @@
         { "fieldPath": "tenantId", "order": "ASCENDING" },
         { "fieldPath": "landlordId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "chats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "listingId", "order": "ASCENDING" },
+        { "fieldPath": "landlordId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

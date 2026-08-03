@@ -2,6 +2,7 @@ package io.github.howshous.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.howshous.data.firestore.AnalyticsRepository
 import io.github.howshous.data.firestore.ChatRepository
 import io.github.howshous.data.firestore.ContractRepository
 import io.github.howshous.data.models.Chat
@@ -14,6 +15,8 @@ import kotlinx.coroutines.launch
 class ChatViewModel : ViewModel() {
     private val chatRepo = ChatRepository()
     private val contractRepo = ContractRepository()
+    private val analyticsRepo = AnalyticsRepository()
+    private val syncedMessageAnalytics = mutableSetOf<String>()
 
     private val _chats = MutableStateFlow<List<Chat>>(emptyList())
     val chats: StateFlow<List<Chat>> = _chats
@@ -55,7 +58,19 @@ class ChatViewModel : ViewModel() {
             _isLoading.value = true
             val messages = chatRepo.getMessagesForChat(chatId)
             _messages.value = messages
-            loadChat(chatId)
+            val chat = chatRepo.getChat(chatId)
+            _currentChat.value = chat
+            if (
+                chat != null &&
+                messages.isNotEmpty() &&
+                syncedMessageAnalytics.add(chatId)
+            ) {
+                analyticsRepo.syncExistingMessage(
+                    chatId = chatId,
+                    listingId = chat.listingId,
+                    landlordId = chat.landlordId,
+                )
+            }
             loadContractsForChat(chatId, userId)
             _isLoading.value = false
         }
